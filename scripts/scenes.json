@@ -1,0 +1,2233 @@
+{
+  "notes": "Per-scene slicing config for the 5 new diorama scenes. Coordinates are in the 1920x1080 frame, measured from the generated source art. Larger depth = nearer (0-255). Layer priority (topmost wins): layer4 > layer3 > layer2 > layer1 > layer0 (backdrop). Shapes: {\"e\": [cx,cy,rx,ry]} ellipse, {\"r\": [x0,y0,x1,y1]} rect, {\"p\": [[x,y],...]} polygon. Masks mirror the ramen scene's 7 stencils; 'cloth' is the cloth element of the scene (noren/curtains/lattice), wherever it lives. 'static_file' is the cloth layer with its panels punched out (for the strip rig); null when the scene has no cloth strips.",
+  "scenes": {
+    "kamakura-enoden": {
+      "anchors": {
+        "counter_top_y": 800,
+        "eyes": [
+          [
+            1210,
+            478
+          ],
+          [
+            1230,
+            478
+          ]
+        ],
+        "lantern_front_pivot": [
+          1290,
+          180
+        ],
+        "lantern_rear_pivot": [
+          900,
+          260
+        ],
+        "steam_top": [
+          400,
+          400
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 150,
+          "name": "platform is near",
+          "rect": [
+            1100,
+            850,
+            1800,
+            1050
+          ]
+        },
+        {
+          "mean_lt": 40,
+          "name": "sea and sky are far",
+          "rect": [
+            0,
+            50,
+            600,
+            400
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.15,
+        "interior_rect": [
+          1000,
+          650,
+          1920,
+          1080
+        ],
+        "patch": [
+          950,
+          1050,
+          1500,
+          1700
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-far-station.png",
+          "shapes": [
+            {
+              "r": [
+                1360,
+                360,
+                1580,
+                580
+              ]
+            },
+            {
+              "r": [
+                890,
+                260,
+                940,
+                470
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "close": 9,
+          "file": "layer2-roof.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  990,
+                  0
+                ],
+                [
+                  1920,
+                  0
+                ],
+                [
+                  1920,
+                  420
+                ],
+                [
+                  1350,
+                  420
+                ],
+                [
+                  1050,
+                  200
+                ]
+              ]
+            },
+            {
+              "r": [
+                1240,
+                180,
+                1340,
+                900
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "file": "layer3-train.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  310,
+                  430
+                ],
+                [
+                  1210,
+                  430
+                ],
+                [
+                  1210,
+                  790
+                ],
+                [
+                  310,
+                  800
+                ]
+              ]
+            },
+            {
+              "r": [
+                510,
+                260,
+                710,
+                430
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              1000,
+              650,
+              1920,
+              1080
+            ],
+            "threshold": 150
+          },
+          "file": "layer4-platform.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  1050,
+                  1080
+                ],
+                [
+                  1350,
+                  690
+                ],
+                [
+                  1920,
+                  690
+                ],
+                [
+                  1920,
+                  1080
+                ]
+              ]
+            },
+            {
+              "e": [
+                1270,
+                500,
+                45,
+                55
+              ]
+            },
+            {
+              "r": [
+                1210,
+                520,
+                1340,
+                830
+              ]
+            },
+            {
+              "r": [
+                1450,
+                610,
+                1750,
+                760
+              ]
+            },
+            {
+              "r": [
+                1730,
+                510,
+                1920,
+                900
+              ]
+            },
+            {
+              "e": [
+                1669,
+                760,
+                80,
+                70
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "rect",
+          "rect": [
+            1350,
+            430,
+            1920,
+            1080
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                356,
+                656,
+                25,
+                25
+              ]
+            },
+            {
+              "e": [
+                525,
+                656,
+                25,
+                25
+              ]
+            },
+            {
+              "r": [
+                1210,
+                250,
+                1330,
+                275
+              ]
+            },
+            {
+              "r": [
+                1400,
+                300,
+                1500,
+                320
+              ]
+            },
+            {
+              "r": [
+                1760,
+                580,
+                1840,
+                660
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              1270,
+              262
+            ],
+            [
+              1450,
+              310
+            ],
+            [
+              356,
+              656
+            ],
+            [
+              525,
+              656
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "kind": "union",
+          "parts": [
+            {
+              "below": 50,
+              "kind": "depth_rect",
+              "rect": [
+                0,
+                0,
+                1000,
+                600
+              ]
+            },
+            {
+              "kind": "poly",
+              "poly": [
+                [
+                  280,
+                  780
+                ],
+                [
+                  1300,
+                  780
+                ],
+                [
+                  1300,
+                  1080
+                ],
+                [
+                  280,
+                  1080
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                300,
+                480,
+                400,
+                100
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              1050,
+              800
+            ],
+            [
+              1920,
+              700
+            ],
+            [
+              1920,
+              1080
+            ],
+            [
+              1050,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Kamakura Enoden seaside station",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "eyes",
+        "steam_top",
+        "lantern_front_pivot",
+        "lantern_rear_pivot",
+        "counter_top_y"
+      ]
+    },
+    "kyoto-matcha": {
+      "anchors": {
+        "bowl_center": [
+          900,
+          731
+        ],
+        "counter_top_y": 750,
+        "eyes": [
+          [
+            741,
+            375
+          ],
+          [
+            806,
+            370
+          ]
+        ],
+        "lantern_front_pivot": [
+          234,
+          0
+        ],
+        "lantern_rear_pivot": [
+          1556,
+          430
+        ],
+        "steam_top": [
+          900,
+          560
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 140,
+          "name": "table is near",
+          "rect": [
+            800,
+            800,
+            1300,
+            1000
+          ]
+        },
+        {
+          "mean_lt": 60,
+          "name": "garden is far",
+          "rect": [
+            1250,
+            100,
+            1850,
+            700
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.28,
+        "interior_rect": [
+          0,
+          0,
+          1180,
+          1080
+        ],
+        "patch": [
+          50,
+          150,
+          380,
+          560
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-stone-lanterns.png",
+          "shapes": [
+            {
+              "e": [
+                1556,
+                516,
+                65,
+                85
+              ]
+            },
+            {
+              "e": [
+                1462,
+                459,
+                45,
+                60
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "close": 9,
+          "file": "layer2-lattice.png",
+          "shapes": [
+            {
+              "r": [
+                950,
+                110,
+                1110,
+                780
+              ]
+            },
+            {
+              "r": [
+                1680,
+                0,
+                1920,
+                1080
+              ]
+            },
+            {
+              "r": [
+                0,
+                0,
+                115,
+                900
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "file": "layer3-paper-lantern.png",
+          "shapes": [
+            {
+              "e": [
+                234,
+                244,
+                105,
+                135
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              400,
+              250,
+              1500,
+              1080
+            ],
+            "threshold": 140
+          },
+          "file": "layer4-woman-table.png",
+          "shapes": [
+            {
+              "e": [
+                713,
+                375,
+                130,
+                130
+              ]
+            },
+            {
+              "r": [
+                450,
+                420,
+                900,
+                1080
+              ]
+            },
+            {
+              "r": [
+                210,
+                850,
+                700,
+                1080
+              ]
+            },
+            {
+              "r": [
+                730,
+                750,
+                1400,
+                1080
+              ]
+            },
+            {
+              "e": [
+                1106,
+                680,
+                110,
+                90
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "rect",
+          "rect": [
+            0,
+            0,
+            1180,
+            1080
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                234,
+                244,
+                105,
+                135
+              ]
+            },
+            {
+              "e": [
+                1556,
+                516,
+                65,
+                85
+              ]
+            },
+            {
+              "e": [
+                1462,
+                459,
+                45,
+                60
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              234,
+              244
+            ],
+            [
+              1556,
+              516
+            ],
+            [
+              1462,
+              459
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "below": 90,
+          "kind": "depth_rect",
+          "rect": [
+            1180,
+            0,
+            1920,
+            1080
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                900,
+                650,
+                90,
+                110
+              ]
+            },
+            {
+              "p": [
+                [
+                  850,
+                  560
+                ],
+                [
+                  960,
+                  560
+                ],
+                [
+                  940,
+                  750
+                ],
+                [
+                  870,
+                  750
+                ]
+              ]
+            },
+            {
+              "e": [
+                1106,
+                600,
+                70,
+                90
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "below": 70,
+          "blur": 6,
+          "kind": "depth_poly",
+          "poly": [
+            [
+              1200,
+              700
+            ],
+            [
+              1920,
+              700
+            ],
+            [
+              1920,
+              1080
+            ],
+            [
+              1200,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Kyoto machiya green-tea house",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "eyes",
+        "bowl_center",
+        "steam_top",
+        "lantern_front_pivot",
+        "lantern_rear_pivot",
+        "counter_top_y"
+      ]
+    },
+    "kyoto-yasaka": {
+      "anchors": {
+        "counter_top_y": 650,
+        "figure": [
+          1031,
+          550
+        ],
+        "lantern_front_pivot": [
+          1462,
+          450
+        ],
+        "lantern_rear_pivot": [
+          656,
+          430
+        ],
+        "steam_top": [
+          960,
+          420
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 120,
+          "name": "slope is near",
+          "rect": [
+            500,
+            800,
+            1400,
+            1050
+          ]
+        },
+        {
+          "mean_lt": 40,
+          "name": "sky is far",
+          "rect": [
+            600,
+            0,
+            1300,
+            150
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.2,
+        "interior_rect": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "patch": [
+          600,
+          750,
+          1600,
+          1800
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-pagoda.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  850,
+                  0
+                ],
+                [
+                  1080,
+                  0
+                ],
+                [
+                  1080,
+                  90
+                ],
+                [
+                  1130,
+                  90
+                ],
+                [
+                  1130,
+                  180
+                ],
+                [
+                  1100,
+                  180
+                ],
+                [
+                  1160,
+                  190
+                ],
+                [
+                  1160,
+                  270
+                ],
+                [
+                  1120,
+                  270
+                ],
+                [
+                  1150,
+                  280
+                ],
+                [
+                  1150,
+                  350
+                ],
+                [
+                  1110,
+                  350
+                ],
+                [
+                  1140,
+                  360
+                ],
+                [
+                  1140,
+                  440
+                ],
+                [
+                  810,
+                  440
+                ],
+                [
+                  840,
+                  360
+                ],
+                [
+                  810,
+                  350
+                ],
+                [
+                  850,
+                  340
+                ],
+                [
+                  820,
+                  270
+                ],
+                [
+                  860,
+                  260
+                ],
+                [
+                  830,
+                  190
+                ],
+                [
+                  870,
+                  180
+                ],
+                [
+                  840,
+                  90
+                ],
+                [
+                  880,
+                  90
+                ]
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "close": 9,
+          "file": "layer2-facades.png",
+          "shapes": [
+            {
+              "r": [
+                0,
+                0,
+                660,
+                620
+              ]
+            },
+            {
+              "r": [
+                1220,
+                0,
+                1920,
+                620
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "file": "layer3-figure.png",
+          "shapes": [
+            {
+              "e": [
+                1031,
+                465,
+                75,
+                45
+              ]
+            },
+            {
+              "r": [
+                1000,
+                490,
+                1065,
+                655
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              300,
+              600,
+              1620,
+              1080
+            ],
+            "threshold": 120
+          },
+          "file": "layer4-slope-lanterns.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  400,
+                  650
+                ],
+                [
+                  1520,
+                  650
+                ],
+                [
+                  1620,
+                  1080
+                ],
+                [
+                  300,
+                  1080
+                ]
+              ]
+            },
+            {
+              "e": [
+                1462,
+                581,
+                85,
+                125
+              ]
+            },
+            {
+              "e": [
+                450,
+                581,
+                80,
+                120
+              ]
+            },
+            {
+              "e": [
+                656,
+                525,
+                60,
+                90
+              ]
+            },
+            {
+              "e": [
+                1219,
+                506,
+                60,
+                90
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "union",
+          "parts": [
+            {
+              "kind": "poly",
+              "poly": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  660,
+                  0
+                ],
+                [
+                  660,
+                  200
+                ],
+                [
+                  0,
+                  200
+                ]
+              ]
+            },
+            {
+              "kind": "poly",
+              "poly": [
+                [
+                  1220,
+                  0
+                ],
+                [
+                  1920,
+                  0
+                ],
+                [
+                  1920,
+                  200
+                ],
+                [
+                  1220,
+                  200
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                1462,
+                581,
+                85,
+                125
+              ]
+            },
+            {
+              "e": [
+                450,
+                581,
+                80,
+                120
+              ]
+            },
+            {
+              "e": [
+                656,
+                525,
+                60,
+                90
+              ]
+            },
+            {
+              "e": [
+                1219,
+                506,
+                60,
+                90
+              ]
+            },
+            {
+              "r": [
+                960,
+                120,
+                1010,
+                150
+              ]
+            },
+            {
+              "r": [
+                955,
+                210,
+                1015,
+                240
+              ]
+            },
+            {
+              "r": [
+                950,
+                300,
+                1020,
+                330
+              ]
+            },
+            {
+              "r": [
+                945,
+                380,
+                1025,
+                410
+              ]
+            },
+            {
+              "r": [
+                300,
+                400,
+                600,
+                550
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              1462,
+              581
+            ],
+            [
+              450,
+              581
+            ],
+            [
+              656,
+              525
+            ],
+            [
+              1219,
+              506
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "kind": "all_minus",
+          "polys": [
+            [
+              [
+                0,
+                0
+              ],
+              [
+                660,
+                0
+              ],
+              [
+                660,
+                200
+              ],
+              [
+                0,
+                200
+              ]
+            ],
+            [
+              [
+                1220,
+                0
+              ],
+              [
+                1920,
+                0
+              ],
+              [
+                1920,
+                200
+              ],
+              [
+                1220,
+                200
+              ]
+            ]
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                960,
+                500,
+                350,
+                80
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              400,
+              650
+            ],
+            [
+              1520,
+              650
+            ],
+            [
+              1620,
+              1080
+            ],
+            [
+              300,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Kyoto Yasaka pagoda, rainy night",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "figure",
+        "steam_top",
+        "lantern_front_pivot",
+        "lantern_rear_pivot",
+        "counter_top_y"
+      ]
+    },
+    "osaka-cafe": {
+      "anchors": {
+        "counter_top_y": 730,
+        "cup_center": [
+          1547,
+          675
+        ],
+        "eyes": [
+          [
+            1425,
+            600
+          ],
+          [
+            1500,
+            598
+          ]
+        ],
+        "lantern_front_pivot": [
+          848,
+          0
+        ],
+        "lantern_rear_pivot": [
+          741,
+          0
+        ],
+        "steam_top": [
+          1547,
+          580
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 140,
+          "name": "counter is near",
+          "rect": [
+            50,
+            780,
+            1400,
+            1000
+          ]
+        },
+        {
+          "mean_lt": 70,
+          "name": "street through window is far",
+          "rect": [
+            1050,
+            380,
+            1800,
+            800
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.28,
+        "interior_rect": [
+          0,
+          0,
+          890,
+          1080
+        ],
+        "patch": [
+          880,
+          1030,
+          350,
+          520
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-neon.png",
+          "shapes": [
+            {
+              "r": [
+                1310,
+                120,
+                1720,
+                310
+              ]
+            },
+            {
+              "r": [
+                980,
+                175,
+                1165,
+                245
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "file": "layer2-window-frames.png",
+          "shapes": [
+            {
+              "r": [
+                885,
+                0,
+                908,
+                1080
+              ]
+            },
+            {
+              "p": [
+                [
+                  1213,
+                  0
+                ],
+                [
+                  1250,
+                  0
+                ],
+                [
+                  1280,
+                  1080
+                ],
+                [
+                  1243,
+                  1080
+                ]
+              ]
+            },
+            {
+              "r": [
+                1793,
+                0,
+                1830,
+                1080
+              ]
+            },
+            {
+              "r": [
+                885,
+                25,
+                1920,
+                75
+              ]
+            }
+          ],
+          "z": 0.15,
+          "notes": "mullions measured from a 1.5x zoom of the window wall; center mullion slants right with perspective so it is a polygon, not a rect"
+        },
+        "layer3": {
+          "file": "layer3-lamps.png",
+          "shapes": [
+            {
+              "e": [
+                848,
+                281,
+                105,
+                105
+              ]
+            },
+            {
+              "e": [
+                741,
+                169,
+                110,
+                70
+              ]
+            },
+            {
+              "e": [
+                169,
+                103,
+                55,
+                75
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              1150,
+              550,
+              1920,
+              1080
+            ],
+            "threshold": 120
+          },
+          "file": "layer4-people-counter.png",
+          "shapes": [
+            {
+              "e": [
+                440,
+                300,
+                130,
+                110
+              ]
+            },
+            {
+              "r": [
+                180,
+                380,
+                640,
+                800
+              ]
+            },
+            {
+              "e": [
+                1480,
+                600,
+                130,
+                130
+              ]
+            },
+            {
+              "r": [
+                1240,
+                640,
+                1700,
+                1080
+              ]
+            },
+            {
+              "r": [
+                0,
+                730,
+                1920,
+                1080
+              ]
+            },
+            {
+              "r": [
+                1010,
+                650,
+                1330,
+                1080
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "union",
+          "parts": [
+            {
+              "kind": "rect",
+              "rect": [
+                0,
+                0,
+                890,
+                1080
+              ]
+            },
+            {
+              "kind": "rect",
+              "rect": [
+                890,
+                860,
+                1920,
+                1080
+              ]
+            }
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                848,
+                281,
+                105,
+                105
+              ]
+            },
+            {
+              "e": [
+                741,
+                169,
+                110,
+                70
+              ]
+            },
+            {
+              "e": [
+                169,
+                103,
+                55,
+                75
+              ]
+            },
+            {
+              "r": [
+                1310,
+                120,
+                1720,
+                310
+              ]
+            },
+            {
+              "r": [
+                980,
+                175,
+                1165,
+                245
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              848,
+              281
+            ],
+            [
+              741,
+              169
+            ],
+            [
+              169,
+              103
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "below": 100,
+          "kind": "depth_rect",
+          "rect": [
+            890,
+            0,
+            1920,
+            860
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                300,
+                740,
+                60,
+                60
+              ]
+            },
+            {
+              "e": [
+                570,
+                620,
+                70,
+                80
+              ]
+            },
+            {
+              "e": [
+                1660,
+                600,
+                50,
+                60
+              ]
+            },
+            {
+              "p": [
+                [
+                  500,
+                  520
+                ],
+                [
+                  640,
+                  520
+                ],
+                [
+                  620,
+                  700
+                ],
+                [
+                  520,
+                  700
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "below": 80,
+          "blur": 6,
+          "kind": "depth_poly",
+          "poly": [
+            [
+              950,
+              680
+            ],
+            [
+              1900,
+              680
+            ],
+            [
+              1900,
+              860
+            ],
+            [
+              950,
+              860
+            ]
+          ]
+        }
+      },
+      "name": "Osaka retro kissaten",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "eyes",
+        "cup_center",
+        "steam_top",
+        "lantern_front_pivot",
+        "lantern_rear_pivot",
+        "counter_top_y"
+      ]
+    },
+    "tokyo-shotengai": {
+      "anchors": {
+        "cat": [
+          1690,
+          845
+        ],
+        "lantern_front_pivot": [
+          56,
+          200
+        ],
+        "lantern_rear_pivot": [
+          1462,
+          150
+        ],
+        "stall_top_y": 700,
+        "steam_top": [
+          580,
+          420
+        ]
+      },
+      "cloth_layer": "layer3",
+      "depth_checks": [
+        {
+          "mean_gt": 100,
+          "name": "near street is near",
+          "rect": [
+            100,
+            900,
+            1800,
+            1060
+          ]
+        },
+        {
+          "mean_lt": 40,
+          "name": "sky and far street are far",
+          "rect": [
+            900,
+            50,
+            1250,
+            400
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.2,
+        "interior_rect": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "patch": [
+          950,
+          1050,
+          900,
+          1100
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-far-street.png",
+          "shapes": [
+            {
+              "r": [
+                700,
+                230,
+                1220,
+                660
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "file": "layer2-shopfronts.png",
+          "shapes": [
+            {
+              "r": [
+                1220,
+                0,
+                1920,
+                750
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "close": 9,
+          "file": "layer3-izakaya.png",
+          "shapes": [
+            {
+              "r": [
+                0,
+                0,
+                620,
+                700
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              850,
+              1920,
+              1080
+            ],
+            "threshold": 110
+          },
+          "file": "layer4-street-stalls.png",
+          "shapes": [
+            {
+              "r": [
+                0,
+                900,
+                1920,
+                1080
+              ]
+            },
+            {
+              "r": [
+                420,
+                560,
+                735,
+                950
+              ]
+            },
+            {
+              "e": [
+                1690,
+                845,
+                100,
+                45
+              ]
+            },
+            {
+              "r": [
+                0,
+                650,
+                80,
+                1000
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "shapes",
+          "shapes": [
+            {
+              "p": [
+                [
+                  122,
+                  356
+                ],
+                [
+                  230,
+                  356
+                ],
+                [
+                  230,
+                  609
+                ],
+                [
+                  122,
+                  609
+                ]
+              ]
+            },
+            {
+              "p": [
+                [
+                  235,
+                  356
+                ],
+                [
+                  340,
+                  356
+                ],
+                [
+                  340,
+                  609
+                ],
+                [
+                  235,
+                  609
+                ]
+              ]
+            },
+            {
+              "p": [
+                [
+                  345,
+                  356
+                ],
+                [
+                  450,
+                  356
+                ],
+                [
+                  450,
+                  609
+                ],
+                [
+                  345,
+                  609
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-dry": {
+          "kind": "union",
+          "parts": [
+            {
+              "kind": "poly",
+              "poly": [
+                [
+                  0,
+                  300
+                ],
+                [
+                  620,
+                  300
+                ],
+                [
+                  620,
+                  700
+                ],
+                [
+                  0,
+                  700
+                ]
+              ]
+            },
+            {
+              "kind": "poly",
+              "poly": [
+                [
+                  1450,
+                  450
+                ],
+                [
+                  1920,
+                  450
+                ],
+                [
+                  1920,
+                  700
+                ],
+                [
+                  1450,
+                  700
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                56,
+                281,
+                55,
+                75
+              ]
+            },
+            {
+              "e": [
+                216,
+                300,
+                55,
+                75
+              ]
+            },
+            {
+              "e": [
+                366,
+                309,
+                55,
+                75
+              ]
+            },
+            {
+              "e": [
+                469,
+                338,
+                55,
+                75
+              ]
+            },
+            {
+              "e": [
+                1462,
+                216,
+                50,
+                70
+              ]
+            },
+            {
+              "e": [
+                1406,
+                262,
+                50,
+                70
+              ]
+            },
+            {
+              "r": [
+                1312,
+                422,
+                1462,
+                488
+              ]
+            },
+            {
+              "r": [
+                581,
+                356,
+                731,
+                488
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              56,
+              281
+            ],
+            [
+              216,
+              300
+            ],
+            [
+              366,
+              309
+            ],
+            [
+              469,
+              338
+            ],
+            [
+              1462,
+              216
+            ],
+            [
+              1406,
+              262
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "kind": "all_minus",
+          "polys": [
+            [
+              [
+                0,
+                300
+              ],
+              [
+                620,
+                300
+              ],
+              [
+                620,
+                700
+              ],
+              [
+                0,
+                700
+              ]
+            ],
+            [
+              [
+                1450,
+                450
+              ],
+              [
+                1920,
+                450
+              ],
+              [
+                1920,
+                700
+              ],
+              [
+                1450,
+                700
+              ]
+            ]
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                580,
+                520,
+                120,
+                90
+              ]
+            },
+            {
+              "p": [
+                [
+                  500,
+                  420
+                ],
+                [
+                  680,
+                  420
+                ],
+                [
+                  660,
+                  620
+                ],
+                [
+                  520,
+                  620
+                ]
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              600,
+              700
+            ],
+            [
+              1400,
+              700
+            ],
+            [
+              1500,
+              1080
+            ],
+            [
+              500,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Tokyo shitamachi shopping street",
+      "punch_polys": [
+        [
+          [
+            122,
+            356
+          ],
+          [
+            230,
+            356
+          ],
+          [
+            230,
+            609
+          ],
+          [
+            122,
+            609
+          ]
+        ],
+        [
+          [
+            235,
+            356
+          ],
+          [
+            340,
+            356
+          ],
+          [
+            340,
+            609
+          ],
+          [
+            235,
+            609
+          ]
+        ],
+        [
+          [
+            345,
+            356
+          ],
+          [
+            450,
+            356
+          ],
+          [
+            450,
+            609
+          ],
+          [
+            345,
+            609
+          ]
+        ]
+      ],
+      "punch_test_point": [
+        180,
+        480
+      ],
+      "required_anchors": [
+        "steam_top",
+        "lantern_front_pivot",
+        "lantern_rear_pivot",
+        "stall_top_y",
+        "cat"
+      ]
+    }
+  },
+  "version": 1
+}

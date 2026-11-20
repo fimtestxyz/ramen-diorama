@@ -1,0 +1,92 @@
+{
+  "scene": "kyoto-yasaka",
+  "name": "Kyoto Yasaka pagoda, rainy night",
+  "source": "assets/scenes/kyoto-yasaka/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.2425
+    },
+    "layer1": {
+      "file": "layers/layer1-pagoda.png",
+      "z": -0.05,
+      "coverage": 0.06
+    },
+    "layer2": {
+      "file": "layers/layer2-facades.png",
+      "z": 0.15,
+      "coverage": 0.3758
+    },
+    "layer3": {
+      "file": "layers/layer3-figure.png",
+      "z": 0.2,
+      "coverage": 0.0096
+    },
+    "layer4": {
+      "file": "layers/layer4-slope-lanterns.png",
+      "z": 0.34,
+      "coverage": 0.312
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.3758
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.1319
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0679
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.0014
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.8681
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0426
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.2532
+    }
+  },
+  "anchors": {
+    "counter_top_y": 650,
+    "figure": [
+      1031,
+      550
+    ],
+    "lantern_front_pivot": [
+      1462,
+      450
+    ],
+    "lantern_rear_pivot": [
+      656,
+      430
+    ],
+    "steam_top": [
+      960,
+      420
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.241,
+    "p99": 5.6,
+    "max": 148.1
+  }
+}

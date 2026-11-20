@@ -192,6 +192,55 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   upload (like the layer PNGs), never the App. Same for any future
   binary asset.
 
+## Phase 2 lessons (2026-11-20, multi-scene)
+
+- **A hardcoded count in a loop is a latent crash for the next
+  scene.** `createSim` built `signs` as a fixed 5 and `lanterns` as
+  a fixed 2, and `stepSim`'s flicker loop ran `for (i < 5)` and its
+  lantern loop `for (i < 2)`. The ramen scene masked all of it.
+  The moment a scene has 1 sign (matcha) the loops throw every
+  frame. Per-scene arrays must be built from the registry, and
+  every loop over them must use `.length` — never a literal.
+- **Do not swing a layer by its id — swing a lantern by its def.**
+  Layer1/layer3 are lantern plates on ramen, but a station building
+  and a train on enoden, a pagoda and a figure on yasaka. The swing
+  system is driven by an explicit per-scene `lanterns` array; the
+  layer toggle hides a swing group only when one exists for that
+  layer, otherwise the plate. Same for the rig: enoden HAS eyes in
+  its manifest but is deliberately NOT rigged (the passenger is
+  20 px wide) — the registry's `rig: null` decides, not the
+  manifest's anchors.
+- **A texture-v is not a frame fraction.** The bowl-steam bug:
+  `bowlV = 1 - y/1080` (from the bottom) was passed where a
+  fraction from the top was expected, mirroring the steam to the
+  top of the frame. It shipped in the build and survived two live
+  E2E rounds because nobody looked at where the steam actually
+  sat. Any helper that takes a vertical position must say which
+  origin it uses in its name or its comment — and the fix
+  (`steamPlaneRect`) is a pure, tested function, not an inline
+  arithmetic change.
+- **A live observation and the shipped files can both be right
+  about different things.** The E2E layer3 report was not a wiring
+  bug: the PNGs put the lantern on layer3 and the mist on no layer
+  at all. The most likely cause is the animated mist + the
+  additive emissive glow persisting after the lantern hid. Pin it
+  with file + code evidence (tests), harden the wiring anyway
+  (group branch only when a group exists), and still demand a live
+  re-check before closing it — do not declare the E2E wrong from
+  the desk.
+- **A scene switch must dispose, not just rebuild.** Geometries,
+  materials, textures, water render targets, and the post scene
+  all accumulate per switch if nothing frees them. `postRT` is the
+  one exception — it is reused across switches, so it must never
+  be disposed by the traversal (its texture is referenced by
+  `postMat.uTex`). The zero-clear quad in `buildWater` is local
+  and recreated per build — dispose it there, not in the switch.
+- **vm-realm arrays fail `deepStrictEqual`.** The logic block runs
+  in a `vm` sandbox, so its arrays have a different Array
+  prototype. Assert with `.join(',')` or field-by-field, never
+  `deepEqual` on a vm-produced array (the smoke test failed on
+  identical contents for exactly this reason).
+
 ## Push rules (repo-wide, learned 2026-11-18)
 
 - The Muse GitHub App pushes ordinary files fine (installation is

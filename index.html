@@ -187,11 +187,19 @@
 </div>
 
 <div id="title" class="hud glass">
-  <h1>深夜ラーメン <span>· 2.5D</span></h1>
+  <h1 id="scene-title">深夜ラーメン <span>· 2.5D</span></h1>
   <p>一張圖 · 全部在你的裝置上算出來 · <span id="fps">— fps</span></p>
 </div>
 
 <div id="topbtns" class="hud">
+  <select class="btn" id="sel-scene" title="切換場景">
+    <option value="ramen" selected>🍜 深夜拉麵</option>
+    <option value="osaka-cafe">☕ 大阪喫茶店</option>
+    <option value="kyoto-matcha">🍵 京都町家抹茶屋</option>
+    <option value="kamakura-enoden">🚃 鎌倉江之電</option>
+    <option value="tokyo-shotengai">🏮 東京下町商店街</option>
+    <option value="kyoto-yasaka">🗼 京都八坂塔</option>
+  </select>
   <button class="btn" id="btn-audio" title="音效 (M)">🔇 音效</button>
   <button class="btn" id="btn-compare" title="對比原圖 (C)">◐ 對比</button>
   <button class="btn" id="btn-inspector" title="圖層檢查器 (D)">▦ 檢查</button>
@@ -295,6 +303,119 @@
     '3am':   { rain: 0.25, wind: 0.15, flicker: 0.35, steam: 0.7, parallax: 0.6, lightning: 0 },
     steam:   { rain: 0.15, wind: 0.1, flicker: 0.4, steam: 1.0, parallax: 0.7, lightning: 0 }
   };
+  /* Scene registry (Phase 2, 2026-11-20): the ramen shop plus the five
+     scenes built in Phase 1. All geometry is measured from the shipped
+     assets, not assumed:
+     - street: the mask-street bounding box (frame px), i.e. where rain
+       splashes and the puddle shader live.
+     - signs: connected components of mask-emissive (bbox, area order);
+       the osaka 居酒屋 / たこ焼き signs were checked and are NOT in
+       the emissive mask (mean 0), so they are not tap targets.
+     - lantern bodies: manifest pivots + layer-alpha centroids.
+     - steam src/top: manifest anchors (bowl/cup/stall/steam_top).
+     - cloth panels: ramen from slice.py (NOREN_LEFT/RIGHT), shotengai
+       from scripts/scenes.json punch_polys.
+     - drips: null where drips make no sense (osaka is an interior —
+       no rain drips inside a cafe).
+     The ramen entry reproduces the old hardcoded constants exactly:
+     street {0,700,691.2,1080} (= x 0..0.36, y 700..1080), drips
+     x 0.05..0.33, landY 0.62, signs = the old TAP_SIGNS, noren =
+     the old panels, lanterns = the old pivots/bodies. */
+  var SCENES = [
+    { id: 'ramen', name: '深夜拉麵', title: '深夜ラーメン', dir: 'assets',
+      taxi: true,
+      rig: { pivot: [1630, 640], hair: true, sigma: 0.00045 },
+      cloth: { layer: 'layer2', panels: [
+        { x0: 785, x1: 1040, yTop: 55, yBot0: 730, yBot1: 695 },
+        { x0: 1055, x1: 1295, yTop: 55, yBot0: 700, yBot1: 680 } ] },
+      lanterns: [
+        { layer: 'layer1', pivot: [1405, 120], body: [1405, 255], rx: 75, ry: 125, level: 7, taps: [[1405, 255, 120]] },
+        { layer: 'layer3', pivot: [445, 0], body: [445, 175], rx: 118, ry: 180, level: 6, taps: [[445, 175, 140]] } ],
+      signs: [[15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
+              [430, 560, 500, 740], [1500, 120, 1830, 230]],
+      steam: { src: [1505, 885], top: [1520, 560], width: 0.16, z: 0.34, mist: [0.22, 0.72], second: [0.60, 0.55] },
+      street: { x0: 0, y0: 700, x1: 691.2, y1: 1080 },
+      drips: { x0: 0.05, x1: 0.33, y0: 0.09, landY: 0.62 } },
+    { id: 'osaka-cafe', name: '大阪喫茶店', title: '大阪喫茶店', dir: 'assets/scenes/osaka-cafe',
+      taxi: false,
+      rig: { pivot: [1462, 689], hair: true, sigma: 0.00024 },
+      cloth: null,
+      lanterns: [
+        { layer: 'layer3', pivot: [848, 0], body: [848, 200], rx: 60, ry: 90, level: 6,
+          taps: [[848, 200, 120], [741, 220, 100]] } ],
+      signs: [[1310, 120, 1720, 310], [631, 99, 954, 387], [114, 28, 225, 179], [980, 175, 1165, 245]],
+      steam: { src: [1547, 675], top: [1547, 580], width: 0.10, z: 0.34, mist: [0.74, 0.70] },
+      street: { x0: 950, y0: 680, x1: 1900, y1: 837 },
+      drips: null },
+    { id: 'kyoto-matcha', name: '京都町家抹茶屋', title: '京都町家抹茶屋', dir: 'assets/scenes/kyoto-matcha',
+      taxi: false,
+      rig: { pivot: [773, 450], hair: false, sigma: 0.00018 },
+      cloth: null,
+      lanterns: [
+        { layer: 'layer3', pivot: [234, 0], body: [234, 244], rx: 110, ry: 140, level: 6, taps: [[234, 244, 130]] } ],
+      signs: [[1417, 399, 1622, 602]],
+      steam: { src: [900, 731], top: [900, 560], width: 0.16, z: 0.34, mist: [0.76, 0.72] },
+      street: { x0: 1200, y0: 700, x1: 1737, y1: 863 },
+      drips: { x0: 0.62, x1: 0.90, y0: 0.05, landY: 0.62 } },
+    { id: 'kamakura-enoden', name: '鎌倉江之電', title: '鎌倉江之電', dir: 'assets/scenes/kamakura-enoden',
+      taxi: false,
+      rig: null,
+      cloth: null,
+      lanterns: [],
+      signs: [[1760, 580, 1840, 660], [1210, 250, 1330, 275], [500, 631, 551, 682],
+              [331, 382, 382, 682], [1400, 300, 1500, 320]],
+      steam: { src: [400, 500], top: [400, 400], width: 0.12, z: 0.20, mist: [0.77, 0.82] },
+      street: { x0: 1050, y0: 701, x1: 1919, y1: 1079 },
+      drips: { x0: 0.55, x1: 1.0, y0: 0.05, landY: 0.62 } },
+    { id: 'tokyo-shotengai', name: '東京下町商店街', title: '東京下町商店街', dir: 'assets/scenes/tokyo-shotengai',
+      taxi: false,
+      rig: null,
+      cloth: { layer: 'layer3', panels: [
+        { x0: 122, x1: 230, yTop: 356, yBot0: 609, yBot1: 609 },
+        { x0: 235, x1: 340, yTop: 356, yBot0: 609, yBot1: 609 },
+        { x0: 345, x1: 450, yTop: 356, yBot0: 609, yBot1: 609 } ] },
+      lanterns: [],
+      signs: [[311, 234, 525, 414], [581, 356, 731, 488], [1356, 146, 1513, 333],
+              [0, 206, 112, 357], [161, 225, 272, 376]],
+      steam: { src: [580, 700], top: [580, 420], width: 0.16, z: 0.34, mist: [0.52, 0.82] },
+      street: { x0: 501, y0: 700, x1: 1499, y1: 1079 },
+      drips: { x0: 0.26, x1: 0.78, y0: 0.05, landY: 0.62 } },
+    { id: 'kyoto-yasaka', name: '京都八坂塔', title: '京都八坂塔', dir: 'assets/scenes/kyoto-yasaka',
+      taxi: false,
+      rig: null,
+      cloth: null,
+      lanterns: [],
+      signs: [[300, 400, 717, 702], [1377, 456, 1548, 707], [1159, 416, 1280, 597], [945, 120, 1025, 410]],
+      steam: { src: [960, 670], top: [960, 420], width: 0.12, z: 0.34, mist: [0.50, 0.80] },
+      street: { x0: 301, y0: 650, x1: 1619, y1: 1079 },
+      drips: { x0: 0.16, x1: 0.84, y0: 0.05, landY: 0.57 } },
+  ];
+  function sceneById(id) {
+    for (var i = 0; i < SCENES.length; i++) if (SCENES[i].id === id) return SCENES[i];
+    return SCENES[0];
+  }
+  /* Street band as frame fractions (for the sim): {x0, x1, y0, y1}. */
+  function streetFracs(street) {
+    return { x0: street.x0 / 1920, x1: street.x1 / 1920, y0: street.y0 / 1080, y1: street.y1 / 1080 };
+  }
+  /* Steam tap rect: a box around the steam source, from the column top
+     down to the source. For ramen this is [1325,560,1685,885] — the old
+     hardcoded rect was [1330,560,1690,885]. */
+  function steamRect(steam) {
+    return { x0: steam.src[0] - 180, x1: steam.src[0] + 180, y0: steam.top[1], y1: steam.src[1] };
+  }
+  /* Steam plane geometry (frame fractions): the column runs from the
+     source up to the column top, so the plane is centred on their
+     midpoint and exactly as tall as the column. Pure, so the placement
+     is unit-testable — the old app code placed the bowl steam with an
+     inverted v (bowlV = 1 - y/1080 used where a frame fraction from
+     the top was expected), mirroring it to the top of the frame
+     (centre ~y=44 instead of ~y=722). See buildSteamMist. */
+  function steamPlaneRect(steam) {
+    var cy = (steam.src[1] + steam.top[1]) / 2 / 1080;
+    var h = (steam.src[1] - steam.top[1]) / 1080;
+    return { cxU: steam.src[0] / 1920, cyV: cy, hFrac: h, wFrac: steam.width };
+  }
   var MAX_STEPS_PER_FRAME = 5;
 
   function mulberry32(a) {
@@ -419,7 +540,10 @@
   }
 
   /* ---- rain ---- */
-  function makeRain(count, rng) {
+  function makeRain(count, rng, street) {
+    // street: frame fractions {x0,x1,y0,y1} of the splash band; defaults
+    // to the ramen band (x 0..0.36, y 0.65..1.0). Drops land inside the band.
+    var sf = street ? streetFracs(street) : { x0: 0, x1: 0.36, y0: 0.65, y1: 1.0 };
     var drops = [];
     for (var i = 0; i < count; i++) {
       drops.push({
@@ -427,24 +551,24 @@
         speed: 0.55 + rng() * 0.45,          // UV units per second
         slant: (7 + rng() * 8) * Math.PI / 180, // 7-15 degrees
         len: 0.012 + rng() * 0.01,
-        land: 0.65 + rng() * 0.35             // landing y inside the street band
+        land: sf.y0 + rng() * (sf.y1 - sf.y0) // landing y inside the street band
       });
     }
     return drops;
   }
-  /* Returns splash events {x, y, amp} for drops that hit the street band
-     (street occupies UV y 0.65..1.0, x 0..0.36 in the frame).
-     Each drop has a landing y inside the band: it splashes when it reaches
-     it, provided it is still over the band in x. Coordinates are
-     normalised to the water heightfield (x: /0.36, y: (land-0.65)/0.35).
-     WATER-GRID CONVENTION (fixed 2026-11-20, round 1): the heightfield
+  /* WATER-GRID CONVENTION (fixed 2026-11-20, round 1): the heightfield
      is BOTTOM-origin — row 0 is the frame bottom. The street shader
-     samples it at huv.y = (frame fraction from bottom)/0.352, and both
-     the GPU render target and the CPU DataTexture (flipY=false) read
-     row 0 at v=0, i.e. the frame bottom. Sim-space y is TOP-origin, so
-     it is flipped on entry here (and for drips and taps). Before the
-     fix every splash rendered at the mirror-y position in the street. */
-  function stepRain(drops, active, dt, wind, rng) {
+     samples it at huv.y = (frame fraction from bottom)/band-height, and
+     both the GPU render target and the CPU DataTexture (flipY=false)
+     read row 0 at v=0, i.e. the frame bottom. Sim-space y is TOP-origin,
+     so it is flipped on entry here (and for drips and taps). Before the
+     fix every splash rendered at the mirror-y position in the street.
+     Returns splash events {x, y, amp} for drops that hit the street band.
+     Coordinates are normalised to the water heightfield (x across the
+     band, y across the band, flipped to bottom-origin). street defaults
+     to the ramen band. */
+  function stepRain(drops, active, dt, wind, rng, street) {
+    var sf = street ? streetFracs(street) : { x0: 0, x1: 0.36, y0: 0.65, y1: 1.0 };
     var splashes = [];
     for (var i = 0; i < drops.length; i++) {
       var d = drops[i];
@@ -452,23 +576,25 @@
       d.y += d.speed * dt;
       d.x += (Math.tan(d.slant) * d.speed + wind * 0.06) * dt;
       if (d.y >= d.land) {
-        if (d.x > 0.02 && d.x < 0.36) {
-          // Heightfield coords: x spans the street band (0..0.36), y the band (0.65..1.0),
+        if (d.x > sf.x0 + 0.02 && d.x < sf.x1) {
+          // Heightfield coords: x spans the street band, y the band,
           // flipped to bottom-origin (see convention above).
-          splashes.push({ x: d.x / 0.36, y: 1 - (d.land - 0.65) / 0.35, amp: 0.5 + rng() * 0.5 });
+          splashes.push({ x: (d.x - sf.x0) / (sf.x1 - sf.x0),
+                          y: 1 - (d.land - sf.y0) / (sf.y1 - sf.y0),
+                          amp: 0.5 + rng() * 0.5 });
         }
         d.y = -0.02 - rng() * 0.05;
         d.x = rng() * 0.9;
         d.speed = 0.55 + rng() * 0.45;
         d.slant = (7 + rng() * 8) * Math.PI / 180;
-        d.land = 0.65 + rng() * 0.35;
+        d.land = sf.y0 + rng() * (sf.y1 - sf.y0);
       } else if (d.x > 1.05) {
         // Drifted off the right edge before landing: respawn silently.
         d.y = -0.02 - rng() * 0.05;
         d.x = rng() * 0.9;
         d.speed = 0.55 + rng() * 0.45;
         d.slant = (7 + rng() * 8) * Math.PI / 180;
-        d.land = 0.65 + rng() * 0.35;
+        d.land = sf.y0 + rng() * (sf.y1 - sf.y0);
       }
     }
     return splashes;
@@ -479,11 +605,16 @@
   }
 
   /* ---- the deterministic simulation ---- */
-  function createSim(seed) {
+  function createSim(seed, sceneId) {
     var rng = mulberry32(seed == null ? SEED : seed);
     var waterN = 32;
+    var def = sceneById(sceneId);
+    var norenCount = def.cloth ? def.cloth.panels.length * 3 : 0;
+    var dripGeo = def.drips;
     return {
       seed: seed == null ? SEED : seed,
+      sceneId: def.id,
+      geo: def,
       rng: rng,
       t: 0, frame: 0,
       mood: 'drizzle',
@@ -491,24 +622,26 @@
       parallax: { x: 0, y: 0 },
       breath: 0,
       blink: { mode: 'open', t: 0, next: 2.0 + rng() * 2.0 },
-      lanterns: [
-        { a: 0.02, v: 0, len: 1.0 },
-        { a: -0.015, v: 0, len: 0.82 }
-      ],
-      noren: [0, 1, 2, 3, 4, 5].map(function () { return { d: 0, v: 0 }; }),
-      water: { n: waterN, h: new Float32Array(waterN * waterN), v: new Float32Array(waterN * waterN), max: 0 },
-      rain: makeRain(600, rng),
-      drips: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(function () {
-        return { x: 0.05 + rng() * 0.28, y: 0.09 + rng() * 0.4, v: 0, wait: rng() * 2 };
+      lanterns: def.lanterns.map(function (d, i) {
+        return { a: i === 0 ? 0.02 : -0.015, v: 0, len: i === 0 ? 1.0 : 0.82 };
       }),
+      noren: Array.from({ length: norenCount }, function () { return { d: 0, v: 0 }; }),
+      water: { n: waterN, h: new Float32Array(waterN * waterN), v: new Float32Array(waterN * waterN), max: 0 },
+      rain: makeRain(600, rng, def.street),
+      drips: dripGeo ? Array.from({ length: 16 }, function () {
+        return { x: dripGeo.x0 + rng() * (dripGeo.x1 - dripGeo.x0),
+                 y: dripGeo.y0 + rng() * 0.4, v: 0, wait: rng() * 2 };
+      }) : [],
       splashes: [],
       rings: [], // tap splash rings {x, y, age, amp} in water-grid coords; last ~3s
       swirl: 0, swirlAng: 0, // steam swirl strength (0..1) and accumulated twist (rad)
       events: {
-        taxiAt: 16 + rng() * 10, lightningAt: 26 + rng() * 20,
+        // The taxi is a ramen-scene event; other scenes have no taxi
+        // (enoden's train is a static plate, not a passing event).
+        taxiAt: def.taxi ? 16 + rng() * 10 : Infinity, lightningAt: 26 + rng() * 20,
         taxi: 0, lightning: 0, lightningEnv: 0
       },
-      signs: [0, 1, 2, 3, 4].map(function () { return { flicker: 1, dip: 0, spark: 0 }; }),
+      signs: def.signs.map(function () { return { flicker: 1, dip: 0, spark: 0 }; }),
       steamPhase: rng() * 10
     };
   }
@@ -531,19 +664,22 @@
       b.mode = 'open'; b.t = 0; b.next = 2.0 + rng() * 3.5;
     }
 
-    /* lanterns: coupled pendulums, wind-driven */
+    /* lanterns: coupled pendulums, wind-driven. The count is per-scene
+       (2 ramen, 1 osaka/matcha, 0 elsewhere); a lone lantern has no
+       coupling partner, so the coupling term is 0 for it. */
     var windGust = p.wind * 0.35 * Math.sin(t * 0.9) + p.wind * 0.15 * Math.sin(t * 2.3 + 1.7);
-    for (var i = 0; i < 2; i++) {
+    for (var i = 0; i < sim.lanterns.length; i++) {
       var L = sim.lanterns[i], other = sim.lanterns[1 - i];
       var k = Math.pow(2 * Math.PI / (2.2 * L.len), 2);
-      var acc = -k * L.a - 0.18 * L.v + 0.9 * (other.a - L.a) + windGust * 0.6;
+      var acc = -k * L.a - 0.18 * L.v + (other ? 0.9 * (other.a - L.a) : 0) + windGust * 0.6;
       L.v += acc * dt;
       L.a += L.v * dt;
       L.a = clamp(L.a, -0.16, 0.16);
     }
 
-    /* noren panels: damped springs toward a travelling wind ripple */
-    for (var j = 0; j < 6; j++) {
+    /* noren panels: damped springs toward a travelling wind ripple.
+       Panel count is per-scene (6 ramen, 3 shotengai, 0 elsewhere). */
+    for (var j = 0; j < sim.noren.length; j++) {
       var P = sim.noren[j];
       var target = p.wind * 0.10 * Math.sin(2 * Math.PI * (t * 0.7 + j * 0.35));
       var acc2 = 60 * (target - P.d) - 6 * P.v;
@@ -554,26 +690,32 @@
 
     /* rain + splashes into the water */
     var active = Math.floor(600 * p.rain);
-    var spl = stepRain(sim.rain, active, dt, p.wind, rng);
+    var spl = stepRain(sim.rain, active, dt, p.wind, rng, sim.geo.street);
     sim.splashes = spl.slice(0, 8);
     for (var s = 0; s < sim.splashes.length; s++) {
       var sp = sim.splashes[s];
       waterImpulse(sim.water.h, sim.water.n, sp.x, sp.y, sp.amp * 0.6, 0.05);
     }
 
-    /* awning drips: gravity, splash on the street */
+    /* awning drips: gravity, splash on the street. Per-scene band
+       (sim.geo.drips); scenes without one (osaka, an interior) have
+       no drips at all — sim.drips is empty and this loop is a no-op. */
+    var dg = sim.geo.drips;
+    var sf = streetFracs(sim.geo.street);
     for (var d = 0; d < sim.drips.length; d++) {
       var dr = sim.drips[d];
       if (dr.wait > 0) { dr.wait -= dt; continue; }
       dr.v += 2.2 * dt;
       dr.y += dr.v * dt;
-      if (dr.y > 0.62) {
-        // Drip lands at the bottom of the street band: top-origin y 0.95
-        // flips to bottom-origin 0.05 (see the water-grid convention).
-        waterImpulse(sim.water.h, sim.water.n, dr.x / 0.36, 0.05, 0.9, 0.06);
-        sim.splashes.push({ x: dr.x / 0.36, y: 0.05, amp: 0.9 });
-        dr.y = 0.09; dr.v = 0; dr.wait = 0.4 + rng() * 2.4;
-        dr.x = 0.05 + rng() * 0.28;
+      if (dr.y > dg.landY) {
+        // Drip lands at the bottom of the street band: top-origin y
+        // near the band bottom flips to bottom-origin 0.05 (see the
+        // water-grid convention). x is normalised across the band.
+        var fx = (dr.x - sf.x0) / (sf.x1 - sf.x0);
+        waterImpulse(sim.water.h, sim.water.n, fx, 0.05, 0.9, 0.06);
+        sim.splashes.push({ x: fx, y: 0.05, amp: 0.9 });
+        dr.y = dg.y0; dr.v = 0; dr.wait = 0.4 + rng() * 2.4;
+        dr.x = dg.x0 + rng() * (dg.x1 - dg.x0);
       }
     }
 
@@ -594,8 +736,9 @@
     }
     ev.lightningEnv = ev.lightning > 0 ? Math.sin(Math.min(ev.lightning, 1) * Math.PI) : 0;
 
-    /* neon ballast flicker: mostly 1, occasional dip; spark decays */
-    for (var s2 = 0; s2 < 5; s2++) {
+    /* neon ballast flicker: mostly 1, occasional dip; spark decays.
+       The sign count is per-scene (ramen 5, matcha 1). */
+    for (var s2 = 0; s2 < sim.signs.length; s2++) {
       var S = sim.signs[s2];
       if (S.dip > 0) {
         S.dip--;
@@ -661,29 +804,46 @@
     sim.swirl = Math.min(1, sim.swirl + Math.abs(dAng) * 0.6);
   }
   /* Pure tap classification: frame pixels (1920x1080 space) -> what the
-     pointer hit. The app's handleTap is a thin switch over this, so the
-     mapping is unit-testable. Water coords are bottom-origin (see the
-     water-grid convention): a tap at the top of the street band
-     (py=700) maps to fy=1, at the bottom (py=1080) to fy=0. */
-  var TAP_SIGNS = [
-    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
-    [430, 560, 500, 740], [1500, 120, 1830, 230]
-  ];
-  function classifyTap(px, py) {
-    for (var i = 0; i < TAP_SIGNS.length; i++) {
-      var b = TAP_SIGNS[i];
+     pointer hit. Per-scene geometry from the SCENES registry (sign
+     boxes, noren rod, lantern tap circles, steam rect, street band);
+     sceneId defaults to ramen, which reproduces the old hardcoded
+     TAP_SIGNS exactly. The app's handleTap is a thin switch over this,
+     so the mapping is unit-testable. Water coords are bottom-origin
+     (see the water-grid convention): a tap at the top of the street
+     band maps to fy=1, at the bottom to fy=0. */
+  function classifyTap(px, py, sceneId) {
+    var def = sceneById(sceneId);
+    for (var i = 0; i < def.signs.length; i++) {
+      var b = def.signs[i];
       if (px >= b[0] && px <= b[2] && py >= b[1] && py <= b[3]) {
         return { kind: 'neon', sign: i };
       }
     }
-    if (px >= 785 && px <= 1295 && py >= 55 && py <= 730) {
-      return { kind: 'noren', panel: Math.min(5, Math.floor((px - 785) / (510 / 6))) };
+    if (def.cloth) {
+      var rod = def.cloth.panels.reduce(function (acc, p) {
+        return { x0: Math.min(acc.x0, p.x0), x1: Math.max(acc.x1, p.x1),
+                 yTop: p.yTop, yBot: Math.max(acc.yBot, p.yBot0, p.yBot1) };
+      }, { x0: Infinity, x1: -Infinity, yTop: 0, yBot: 0 });
+      var totalPanels = def.cloth.panels.length * 3;
+      if (px >= rod.x0 && px <= rod.x1 && py >= rod.yTop && py <= rod.yBot) {
+        return { kind: 'noren', panel: Math.min(totalPanels - 1,
+          Math.floor((px - rod.x0) / ((rod.x1 - rod.x0) / totalPanels))) };
+      }
     }
-    if (Math.hypot(px - 445, py - 175) < 140) return { kind: 'lantern', which: 1 };
-    if (Math.hypot(px - 1405, py - 255) < 120) return { kind: 'lantern', which: 0 };
-    if (px >= 1330 && px <= 1690 && py >= 560 && py <= 885) return { kind: 'steam' };
-    if (px < 700 && py > 700) {
-      return { kind: 'street', fx: px / 1920 / 0.36, fy: 1 - (py - 700) / 380 };
+    for (var li = 0; li < def.lanterns.length; li++) {
+      var L = def.lanterns[li];
+      for (var ti = 0; ti < L.taps.length; ti++) {
+        var tp = L.taps[ti];
+        if (Math.hypot(px - tp[0], py - tp[1]) < tp[2]) return { kind: 'lantern', which: li };
+      }
+    }
+    var sr = steamRect(def.steam);
+    if (px >= sr.x0 && px <= sr.x1 && py >= sr.y0 && py <= sr.y1) return { kind: 'steam' };
+    var st = def.street;
+    if (px >= st.x0 && px <= st.x1 && py >= st.y0 && py <= st.y1) {
+      return { kind: 'street',
+               fx: (px - st.x0) / (st.x1 - st.x0),
+               fy: 1 - (py - st.y0) / (st.y1 - st.y0) };
     }
     return { kind: 'none' };
   }
@@ -737,11 +897,19 @@
         if (!(zs[i] > zs[i - 1])) errors.push('layer z not strictly increasing at ' + i);
       }
     }
-    if (!m || !m.anchors || !Array.isArray(m.anchors.eyes) || m.anchors.eyes.length !== 2) {
+    // Eyes are per-scene: the ramen / matcha / osaka / enoden scenes
+    // have a person to rig; yasaka and shotengai have none, and their
+    // layer4 renders as a plain plate. If eyes are present they must
+    // be exactly 2 (left + right).
+    if (m && m.anchors && m.anchors.eyes != null
+        && (!Array.isArray(m.anchors.eyes) || m.anchors.eyes.length !== 2)) {
       errors.push('anchors.eyes must have 2 entries');
     }
     if (!m || !m.masks || Object.keys(m.masks).length !== 7) {
       errors.push('expected 7 masks');
+    }
+    if (m && m.cloth_layer != null && typeof m.cloth_layer !== 'string') {
+      errors.push('cloth_layer must be a layer id or null');
     }
     return { ok: errors.length === 0, errors: errors };
   }
@@ -765,12 +933,14 @@
   var RamenLogic = {
     SEED: SEED, DT: DT, CAM_D: CAM_D, PLANE_W: PLANE_W, PLANE_H: PLANE_H,
     OVERSCAN: OVERSCAN, MAX_CAM_X: MAX_CAM_X, MAX_CAM_Y: MAX_CAM_Y,
-    LAYERS: LAYERS, MOODS: MOODS, MAX_STEPS_PER_FRAME: MAX_STEPS_PER_FRAME,
+    LAYERS: LAYERS, MOODS: MOODS, SCENES: SCENES, MAX_STEPS_PER_FRAME: MAX_STEPS_PER_FRAME,
     mulberry32: mulberry32, clamp: clamp,
     plateScale: plateScale, plateShift: plateShift, uvInset: uvInset,
     coversFrame: coversFrame, maxApparentShift: maxApparentShift,
     parallaxScaleFor: parallaxScaleFor, qualityTierFor: qualityTierFor,
-    classifyTap: classifyTap, TAP_SIGNS: TAP_SIGNS,
+    sceneById: sceneById, streetFracs: streetFracs,
+    steamRect: steamRect, steamPlaneRect: steamPlaneRect,
+    classifyTap: classifyTap,
     addRing: addRing, addSwirl: addSwirl,
     waterStep: waterStep, waterImpulse: waterImpulse,
     blinkAmountAt: blinkAmountAt, makeRain: makeRain, stepRain: stepRain,
@@ -808,6 +978,7 @@ function toast(msg, ms) {
 
 const state = {
   sim: L.createSim(L.SEED),
+  sceneId: 'ramen',
   paused: false,
   compare: false,
   curtainX: 0.5,
@@ -822,14 +993,38 @@ const state = {
   frameMs: 0,
 };
 
-/* ---------- manifest + textures ---------- */
+/* ---------- manifest + textures (multi-scene, Phase 2) ---------- */
 let manifest = null;
-async function loadManifest() {
-  const r = await fetch('assets/manifest.json');
-  manifest = await r.json();
-  const check = L.validateManifest(manifest);
+let sceneDef = L.SCENES[0];
+let sceneDir = 'assets';
+let clothZ = 0.15; // z of the current scene's cloth layer (ramen layer2)
+const SCENE_STORAGE_KEY = 'ramen-diorama.scene';
+function savedSceneId() {
+  try {
+    const id = localStorage.getItem(SCENE_STORAGE_KEY);
+    return id && L.sceneById(id).id === id ? id : 'ramen';
+  } catch (e) { return 'ramen'; }
+}
+async function loadSceneManifest(def) {
+  const r = await fetch(def.dir + '/manifest.json');
+  const m = await r.json();
+  const check = L.validateManifest(m);
   if (!check.ok) throw new Error('manifest invalid: ' + check.errors.join('; '));
-  return manifest;
+  return m;
+}
+/* Texture file map for a scene, from its manifest: layer + mask file
+   names are per-scene (e.g. layer3-train.png vs layer3-front-lantern.png),
+   so they are read from the manifest, never hardcoded. The cloth
+   static variant comes from manifest.static_file (ramen's manifest has
+   none, so it defaults to layers/layer2-static.png). */
+function sceneTextureFiles(def, m) {
+  const files = {};
+  for (const [id, info] of Object.entries(m.layers)) files[id] = def.dir + '/' + info.file;
+  files['clothStatic'] = def.dir + '/' + (m.static_file || 'layers/layer2-static.png');
+  files['source'] = m.source;
+  files['depth'] = def.dir + '/depth.png';
+  for (const [id, info] of Object.entries(m.masks)) files[id] = def.dir + '/' + info.file;
+  return files;
 }
 function loadTexture(url, manager) {
   return new Promise((resolve, reject) => {
@@ -883,7 +1078,7 @@ function plateGeometry(z, u0, u1, v0, v1, wSeg, hSeg) {
 
 /* ---------- woman rig shader ---------- */
 const WOMAN_VERT = /* glsl */`
-  uniform float uTime, uBreath, uBlink, uGazeX, uGazeY, uWind;
+  uniform float uTime, uBreath, uBlink, uGazeX, uGazeY, uWind, uHair;
   uniform vec2 uHeadPivot;   // plane-local xy of the neck pivot
   uniform vec2 uEye0, uEye1; // plane-local xy of the eyes
   varying vec2 vUv;
@@ -905,9 +1100,12 @@ const WOMAN_VERT = /* glsl */`
       p.xy = uHeadPivot + rel;
     }
     // Hair + bangs breeze: sway grows toward the hair tips.
+    // uHair gates it per scene (matcha's hair sits outside the shader's
+    // hair UV zone, so it stays 0 there — otherwise the table edge
+    // would sway).
     float hair = smoothstep(0.55, 0.95, uv.x) * smoothstep(0.25, 0.75, uv.y);
-    p.x += hair * uWind * 0.02 * sin(uTime * 1.3 + p.y * 6.0);
-    p.x += hair * 0.006 * sin(uTime * 2.1 + p.y * 9.0);
+    p.x += hair * uHair * uWind * 0.02 * sin(uTime * 1.3 + p.y * 6.0);
+    p.x += hair * uHair * 0.006 * sin(uTime * 2.1 + p.y * 9.0);
     // Eye gaze: nudge the eye regions with the pointer.
     float g0 = exp(-pow(distance(p.xy, uEye0) / 0.09, 2.0));
     float g1 = exp(-pow(distance(p.xy, uEye1) / 0.09, 2.0));
@@ -917,17 +1115,20 @@ const WOMAN_VERT = /* glsl */`
 `;
 const WOMAN_FRAG = /* glsl */`
   uniform sampler2D uMap;
-  uniform float uBlink;
+  uniform float uBlink, uBlinkSigma;
   uniform vec2 uEye0uv, uEye1uv;
   varying vec2 vUv;
   varying vec2 vLocal;
   void main() {
     vec2 uv = vUv;
     // Eyelid: squash the texture vertically toward each eye line as the blink closes.
+    // uBlinkSigma is the eye gaussian width, per scene: the eye pair is
+    // 110 px apart on the ramen woman but 65 px on the matcha woman,
+    // so one fixed radius would squash half the matcha woman's head.
     vec2 d0 = uv - uEye0uv;
     vec2 d1 = uv - uEye1uv;
-    float m0 = exp(-dot(d0, d0) / 0.00045);
-    float m1 = exp(-dot(d1, d1) / 0.00045);
+    float m0 = exp(-dot(d0, d0) / uBlinkSigma);
+    float m1 = exp(-dot(d1, d1) / uBlinkSigma);
     float m = max(m0, m1);
     if (m > 0.01) {
       vec2 eye = m0 > m1 ? uEye0uv : uEye1uv;
@@ -1112,53 +1313,80 @@ const POST_FRAG = /* glsl */`
   }
 `;
 
-/* ---------- scene build ---------- */
+/* ---------- scene build (per-scene, Phase 2) ---------- */
 function buildPlates() {
   const inset = L.uvInset();
-  // Static plates (layer0, layer1-static variant for layer2, layer3).
-  const defs = [
-    { id: 'layer0', tex: 'layer0', z: -0.36 },
-    // Round 2: the lantern plates are ~97-99% transparent pixels; an
-    // alpha test discards them before blending (visually identical —
-    // alpha < 0.02 contributes nothing).
-    { id: 'layer1', tex: 'layer1', z: -0.05, alphaTest: 0.02 },
-    { id: 'layer3', tex: 'layer3', z: 0.20, alphaTest: 0.02 },
-  ];
-  for (const d of defs) {
-    const tex = textures[d.tex];
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: d.alphaTest || 0 });
-    const mesh = new THREE.Mesh(plateGeometry(d.z, 0, 1, 0, 1), mat);
-    mesh.position.z = d.z;
-    mesh.renderOrder = d.z < 0 ? 0 : 2;
-    mesh.userData.layerId = d.id;
+  const clothLayer = manifest.cloth_layer || 'layer2';
+  const zOf = (id) => manifest.layers[id].z;
+  // Static plates: every layer except the cloth layer (static variant +
+  // strips below) and layer4 (rig or plain plate below). Lantern
+  // plates (layer1/layer3 on the ramen scene) carry an alpha test:
+  // their ~97-99% transparent pixels skip blending. Honest limit: an
+  // alpha test discards AFTER the texture fetch, so this saves
+  // blend/overdraw cost, not fetches (see CLAUDE.md round 2).
+  for (const id of Object.keys(manifest.layers)) {
+    if (id === clothLayer || id === 'layer4') continue;
+    const z = zOf(id);
+    const mat = new THREE.MeshBasicMaterial({
+      map: textures[id], transparent: true, depthWrite: false,
+      alphaTest: (id === 'layer1' || id === 'layer3') ? 0.02 : 0,
+    });
+    const mesh = new THREE.Mesh(plateGeometry(z, 0, 1, 0, 1), mat);
+    mesh.position.z = z;
+    mesh.renderOrder = z < 0 ? 0 : 2;
+    mesh.userData.layerId = id;
     scene.add(mesh);
-    plates[d.id] = mesh;
+    plates[id] = mesh;
   }
-  // layer2 static (noren panels punched out) + 6 cloth strips.
-  const tex2 = textures['layer2static'];
-  const mat2 = new THREE.MeshBasicMaterial({ map: tex2, transparent: true, depthWrite: false });
-  const mesh2 = new THREE.Mesh(plateGeometry(0.15, 0, 1, 0, 1), mat2);
-  mesh2.position.z = 0.15;
+  // Cloth layer: static variant (panels punched out) + cloth strips.
+  // (clothZ is module-level: syncScene shifts the strips with it.)
+  clothZ = zOf(clothLayer);
+  const mat2 = new THREE.MeshBasicMaterial({ map: textures['clothStatic'], transparent: true, depthWrite: false });
+  const mesh2 = new THREE.Mesh(plateGeometry(clothZ, 0, 1, 0, 1), mat2);
+  mesh2.position.z = clothZ;
   mesh2.renderOrder = 1;
-  mesh2.userData.layerId = 'layer2';
+  mesh2.userData.layerId = clothLayer;
   scene.add(mesh2);
-  plates['layer2'] = mesh2;
-  buildNorenStrips();
-  // Woman + counter: Live2D rig (128x72 segments).
+  plates[clothLayer] = mesh2;
+  if (sceneDef.cloth) buildNorenStrips();
+  buildLayer4(inset);
+}
+
+/* layer4: the Live2D rig when the scene has a person (manifest eyes +
+   registry rig config), a plain plate otherwise. The enoden passenger
+   is too small to rig (a blink would squash half the figure and the
+   platform benches would breathe); yasaka and shotengai have no eyes
+   at all. */
+function buildLayer4(inset) {
+  const z4 = manifest.layers['layer4'].z;
+  const s4 = L.plateScale(z4);
+  const w4 = L.PLANE_W * s4 * L.OVERSCAN, h4 = L.PLANE_H * s4 * L.OVERSCAN;
+  const rig = sceneDef.rig;
+  const eyes = manifest.anchors && manifest.anchors.eyes;
+  if (!rig || !eyes || eyes.length !== 2) {
+    const mat = new THREE.MeshBasicMaterial({ map: textures['layer4'], transparent: true, depthWrite: false });
+    const mesh = new THREE.Mesh(plateGeometry(z4, 0, 1, 0, 1), mat);
+    mesh.position.z = z4;
+    mesh.renderOrder = 3;
+    mesh.userData.layerId = 'layer4';
+    scene.add(mesh);
+    plates['layer4'] = mesh;
+    return;
+  }
   const anchors = manifest.anchors;
   const eyeUV = anchors.eyes.map((e) => [e[0] / 1920, 1 - e[1] / 1080]);
-  const z4 = 0.34, s4 = L.plateScale(z4);
-  const w4 = L.PLANE_W * s4 * L.OVERSCAN, h4 = L.PLANE_H * s4 * L.OVERSCAN;
   const geo4 = new THREE.PlaneGeometry(w4, h4, 128, 72);
   const uv4 = geo4.attributes.uv;
   for (let i = 0; i < uv4.count; i++) {
     const u = uv4.getX(i), v = uv4.getY(i);
     uv4.setXY(i, (u - inset.u0) / (inset.u1 - inset.u0), (v - inset.u0) / (inset.u1 - inset.u0));
   }
-  // Neck pivot at frame (1630, 640): u = 0.849, v = 1 - 640/1080 = 0.407.
-  // Plane-local coords: local = (uTex - 0.5) * planeSize.
-  const pivotU = inset.u0 + (inset.u1 - inset.u0) * (1630 / 1920);
-  const pivotV = inset.u0 + (inset.u1 - inset.u0) * (1 - 640 / 1080);
+  // Neck pivot from the registry (frame px): ramen (1630, 640) as before;
+  // matcha / osaka pivots are derived from their eye pairs (midpoint x,
+  // eye y + ~1.2x the eye separation). Plane-local coords:
+  // local = (uTex - 0.5) * planeSize.
+  const pivotU = inset.u0 + (inset.u1 - inset.u0) * (rig.pivot[0] / 1920);
+  const pivotV = inset.u0 + (inset.u1 - inset.u0) * (1 - rig.pivot[1] / 1080);
   const headPivot = { x: (pivotU - 0.5) * w4, y: (pivotV - 0.5) * h4 };
   const eyeLocal = eyeUV.map(([eu, ev]) => {
     const tu = inset.u0 + (inset.u1 - inset.u0) * eu;
@@ -1170,6 +1398,8 @@ function buildPlates() {
       uMap: { value: textures['layer4'] },
       uTime: { value: 0 }, uBreath: { value: 0 }, uBlink: { value: 0 },
       uGazeX: { value: 0 }, uGazeY: { value: 0 }, uWind: { value: 0.35 },
+      uHair: { value: rig.hair ? 1 : 0 },
+      uBlinkSigma: { value: rig.sigma },
       uHeadPivot: { value: new THREE.Vector2(headPivot.x, headPivot.y) },
       uEye0: { value: eyeLocal[0] }, uEye1: { value: eyeLocal[1] },
       uEye0uv: { value: new THREE.Vector2(eyeUV[0][0], eyeUV[0][1]) },
@@ -1189,14 +1419,15 @@ function buildPlates() {
 }
 
 function buildNorenStrips() {
-  // Six cloth strips across the noren panels (frame x 785..1295, two panels).
-  const panels = [
-    { x0: 785, x1: 1040, yTop: 55, yBot0: 730, yBot1: 695 },
-    { x0: 1055, x1: 1295, yTop: 55, yBot0: 700, yBot1: 680 },
-  ];
-  const z = 0.15, s = L.plateScale(z);
+  // Cloth strips from the scene registry: ramen has two panels (frame
+  // x 785..1295, rod y 55, 6 strips); shotengai has three panels on
+  // layer3 (frame x 122..450, rod y 356, 3 strips). Each panel is cut
+  // into 3 strips; the strip grid maps frame pixels to plane-local
+  // coords ((u-0.5)*PLANE_W*s, (0.5-fy/1080)*PLANE_H*s).
+  const cloth = sceneDef.cloth;
+  const z = manifest.layers[cloth.layer].z, s = L.plateScale(z);
   let stripIndex = 0;
-  for (const p of panels) {
+  for (const p of cloth.panels) {
     for (let k = 0; k < 3; k++) {
       const f0 = k / 3, f1 = (k + 1) / 3;
       const x0 = p.x0 + (p.x1 - p.x0) * f0, x1 = p.x0 + (p.x1 - p.x0) * f1;
@@ -1239,7 +1470,7 @@ function buildNorenStrips() {
       g.computeVertexNormals();
       const mat = new THREE.ShaderMaterial({
         uniforms: {
-          uMap: { value: textures['layer2'] },
+          uMap: { value: textures[cloth.layer] },
           uTime: { value: 0 }, uDefl: { value: 0 },
           uWind: { value: 0.35 }, uPhase: { value: stripIndex * 0.35 },
         },
@@ -1251,7 +1482,7 @@ function buildNorenStrips() {
       mesh.position.z = z + 0.001;
       mesh.renderOrder = 2;
       mesh.userData.stripIndex = stripIndex;
-      mesh.userData.layerId = 'layer2';
+      mesh.userData.layerId = cloth.layer;
       scene.add(mesh);
       norenStrips.push(mesh);
       stripIndex++;
@@ -1260,22 +1491,25 @@ function buildNorenStrips() {
 }
 
 function buildLanterns() {
-  // Swing each full-frame lantern plate around its ceiling hook.
-  // Pivots come from the manifest (hardcoded fallback = same numbers).
-  const a = manifest.anchors || {};
-  const defs = [
-    { id: 'layer1', pivot: a.lantern_rear_pivot || [1405, 120], z: -0.05 },
-    { id: 'layer3', pivot: a.lantern_front_pivot || [445, 0], z: 0.20 },
-  ];
-  for (const d of defs) {
-    const mesh = plates[d.id];
+  // Swing each hanging-lantern plate around its ceiling hook. Which
+  // layers are lanterns is per-scene (Phase 2): ramen has two (rear
+  // layer1 + front layer3), osaka and matcha have one (layer3 lamps /
+  // paper lantern), the other scenes have none — their layer1/layer3
+  // plates are a station building, a train, a pagoda, a shopfront
+  // block, and must NOT swing. The registry pivot is the manifest
+  // anchor (same numbers); the group index is the sim index, so a tap
+  // (classifyTap `which`) and the swing (syncScene) agree.
+  for (const d of sceneDef.lanterns) {
+    const mesh = plates[d.layer];
+    if (!mesh) continue;
+    const z = manifest.layers[d.layer].z;
     scene.remove(mesh);
-    const local = frameUVToPlaneLocal(d.pivot[0] / 1920, d.pivot[1] / 1080, d.z);
+    const local = frameUVToPlaneLocal(d.pivot[0] / 1920, d.pivot[1] / 1080, z);
     const group = new THREE.Group();
-    group.position.set(local.x, local.y, d.z);
+    group.position.set(local.x, local.y, z);
     mesh.position.set(-local.x, -local.y, 0);
     group.add(mesh);
-    group.userData.layerId = d.id;
+    group.userData.layerId = d.layer;
     // Round 1 fix: the parallax loop used to overwrite mesh.position.x/y
     // every frame, clobbering the (-local.x, -local.y) pivot offset (and
     // reading position.z = 0, so the shift was 0 too) — the lantern
@@ -1284,7 +1518,7 @@ function buildLanterns() {
     // instead; the base pivot is stored for that.
     group.userData.baseX = local.x;
     group.userData.baseY = local.y;
-    group.userData.z = d.z;
+    group.userData.z = z;
     mesh.userData.lantern = true;
     scene.add(group);
     lanternGroups.push(group);
@@ -1320,6 +1554,10 @@ function buildWater() {
   renderer.setRenderTarget(tA); renderer.render(zeroScene, zeroCam);
   renderer.setRenderTarget(tB); renderer.render(zeroScene, zeroCam);
   renderer.setRenderTarget(null);
+  // The clear helpers are local to this build; free them now, or every
+  // scene switch leaks one geometry + one material.
+  zeroQuad.geometry.dispose();
+  zeroMat.dispose();
   const updateMat = new THREE.ShaderMaterial({
     uniforms: {
       uH: { value: tA.texture },
@@ -1366,6 +1604,7 @@ const STREET_FRAG = /* glsl */`
   uniform vec2 uCpuTexel;
   uniform vec2 uInset;
   uniform vec4 uRings[4]; // tap splash rings: x, y (water-grid coords), age (s), amp
+  uniform vec4 uStreetBand; // (x0, yBottom, w, h) of the street band, frame fractions from the bottom-left
   varying vec2 vUv;    // raw frame fraction [0,1]
   void main() {
     // Texture UVs: vUv is the geometry uv; the frame fraction is
@@ -1373,7 +1612,10 @@ const STREET_FRAG = /* glsl */`
     vec2 tuv = (vUv - uInset.x) / (uInset.y - uInset.x);
     float street = texture2D(uStreetMask, tuv).r;
     if (street < 0.02) discard;
-    vec2 huv = vec2(tuv.x / 0.36, tuv.y / 0.352);
+    // Map the frame fraction into street-band space: (0,0) = band
+    // bottom-left, (1,1) = band top-right. Ramen's band is the left
+    // alley (0, 0, 0.36, 0.3519); yasaka's is the full-width slope.
+    vec2 huv = vec2((tuv.x - uStreetBand.x) / uStreetBand.z, (tuv.y - uStreetBand.y) / uStreetBand.w);
     huv = clamp(huv, 0.0, 1.0);
     vec2 grad = vec2(0.0);
     if (uCpuWater > 0.5) {
@@ -1427,6 +1669,10 @@ function buildStreet() {
     uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5);
   }
   const inset = L.uvInset();
+  // The street band is per-scene (ramen: left alley x 0..691 px,
+  // y 700..1080; yasaka: full-width slope). streetFracs converts the
+  // registry's pixel rect to frame fractions from the bottom-left.
+  const band = L.streetFracs(sceneDef.street);
   streetMat = new THREE.ShaderMaterial({
     uniforms: {
       uBg: { value: textures['layer0'] },
@@ -1438,6 +1684,7 @@ function buildStreet() {
       uCpuWaterTex: { value: null },
       uCpuTexel: { value: new THREE.Vector2(1 / 32, 1 / 32) },
       uInset: { value: new THREE.Vector2(inset.u0, inset.u1) },
+      uStreetBand: { value: new THREE.Vector4(band.x0, band.yB, band.w, band.h) },
       uRings: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
     },
     vertexShader: STREET_VERT,
@@ -1486,15 +1733,14 @@ const EMISSIVE_FRAG = /* glsl */`
 `;
 function buildSignMap() {
   // Offscreen canvas: each emissive region gets a gray level 1..7.
+  // Sign boxes come from the scene registry (measured emissive-mask
+  // components, up to 5); lantern ellipses from the lantern defs
+  // (level 6 = front, 7 = rear on ramen; 6 only on osaka/matcha).
   const c = document.createElement('canvas');
   c.width = 1920; c.height = 1080;
   const x = c.getContext('2d');
   x.fillStyle = '#000'; x.fillRect(0, 0, 1920, 1080);
-  const boxes = [
-    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
-    [430, 560, 500, 740], [1500, 120, 1830, 230],
-  ];
-  boxes.forEach(([x0, y0, x1, y1], i) => {
+  sceneDef.signs.forEach(([x0, y0, x1, y1], i) => {
     x.fillStyle = `rgb(${i + 1},${i + 1},${i + 1})`;
     x.fillRect(x0, y0, x1 - x0, y1 - y0);
   });
@@ -1502,8 +1748,7 @@ function buildSignMap() {
     x.fillStyle = `rgb(${v},${v},${v})`;
     x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fill();
   };
-  ell(445, 175, 118, 180, 6);  // front lantern
-  ell(1405, 255, 75, 125, 7);  // rear lantern
+  for (const d of sceneDef.lanterns) ell(d.body[0], d.body[1], d.rx, d.ry, d.level);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.NoColorSpace;
   return tex;
@@ -1605,9 +1850,8 @@ function syncRainLines() {
 
 /* ---------- steam + mist ---------- */
 function buildSteamMist() {
-  const anchors = manifest.anchors;
-  const bowlU = anchors.bowl_center[0] / 1920, bowlV = 1 - anchors.bowl_center[1] / 1080;
-  const s = L.plateScale(0.34);
+  const st = sceneDef.steam;
+  const s = L.plateScale(st.z);
   const mkSteam = (wFrac, hFrac, cxU, cyV) => {
     const w = L.PLANE_W * wFrac * s, h = L.PLANE_H * hFrac * s;
     const mat = new THREE.ShaderMaterial({
@@ -1620,25 +1864,38 @@ function buildSteamMist() {
     mesh.renderOrder = 7;
     // Round 1 fix: the steam planes never shifted with the plates, so
     // the steam detached from the bowl under parallax. Store the base
-    // position; syncScene shifts them with the woman plate (z = 0.34).
+    // position; syncScene shifts them with the steam source's layer.
     mesh.userData.baseX = mesh.position.x;
     mesh.userData.baseY = mesh.position.y;
-    mesh.userData.shiftZ = 0.34;
+    mesh.userData.shiftZ = st.z;
     scene.add(mesh);
     steamMats.push(mat);
     steamMeshes.push(mesh);
     return mesh;
   };
-  mkSteam(0.16, 0.30, bowlU, bowlV - 0.14);  // bowl steam
-  mkSteam(0.10, 0.18, 0.60, 0.55);           // pot / interior steam
-  // Alley mist: wide soft plane over the street.
+  // Main steam column: centred on the midpoint between the source and
+  // the column top, exactly as tall as the column (steamPlaneRect).
+  // FIX (Phase 2): the old code passed bowlV = 1 - y/1080 (texture-v,
+  // from the bottom) where mkSteam expects a frame fraction from the
+  // top — the bowl steam was mirrored to the top of the frame (centre
+  // ~y=44 instead of ~y=722). The ramen mask-steam bbox (x 1316-1694,
+  // y 560-995) confirms the column runs from the bowl (885) up to the
+  // steam top (560). Live E2E must confirm the steam now sits above
+  // the bowl.
+  const rect = L.steamPlaneRect(st);
+  mkSteam(rect.wFrac, rect.hFrac, rect.cxU, rect.cyV);
+  if (st.second) mkSteam(0.10, 0.18, st.second[0], st.second[1]); // ramen pot / interior steam
+  // Alley mist: wide soft plane over the street band. Its centre is
+  // per-scene (registry steam.mist, frame fractions): ramen keeps its
+  // current spot (0.22, 0.72); the other scenes centre it on their
+  // street band.
   const mistMat2 = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uAmount: { value: 0.16 }, uSwirl: { value: 0 }, uSwirlAng: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(1, 0) } },
     vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
     transparent: true, depthWrite: false,
   });
   const mist = new THREE.Mesh(new THREE.PlaneGeometry(L.PLANE_W * 0.42, L.PLANE_H * 0.4), mistMat2);
-  mist.position.set(-L.PLANE_W * 0.28, -L.PLANE_H * 0.22, -0.2);
+  mist.position.set((st.mist[0] - 0.5) * L.PLANE_W, (0.5 - st.mist[1]) * L.PLANE_H, -0.2);
   mist.renderOrder = 5;
   mist.userData.baseX = mist.position.x;
   mist.userData.baseY = mist.position.y;
@@ -1650,6 +1907,9 @@ function buildSteamMist() {
 
 /* ---------- taxi + lightning ---------- */
 function buildTaxi() {
+  // Ramen only: a taxi passes the alley. No other scene has one.
+  taxiGroup = null;
+  if (!sceneDef.taxi) return;
   const g = new THREE.Group();
   const glowTex = (() => {
     const c = document.createElement('canvas');
@@ -1680,12 +1940,20 @@ function buildTaxi() {
 function buildPost() {
   const w = Math.floor(renderer.domElement.width);
   const h = Math.floor(renderer.domElement.height);
-  postRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: true });
+  // Reused across scene switches (a new render target per switch would
+  // leak GPU memory); resized in place when the canvas size changes.
+  if (!postRT) {
+    postRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: true });
+  } else {
+    postRT.setSize(w, h);
+  }
   postScene = new THREE.Scene();
   postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  const bowlUV = new THREE.Vector2(
-    manifest.anchors.bowl_center[0] / 1920,
-    1 - manifest.anchors.bowl_center[1] / 1080);
+  // The post pass brightens the steam directly above the steam source
+  // (bowl on ramen/matcha, cup on osaka, oden pot on shotengai):
+  // the centre is the scene's steam source, from the registry.
+  const st = sceneDef.steam;
+  const bowlUV = new THREE.Vector2(st.src[0] / 1920, 1 - st.src[1] / 1080);
   postMat = new THREE.ShaderMaterial({
     uniforms: {
       uTex: { value: postRT.texture },
@@ -1988,7 +2256,7 @@ function estimateDepthLive() {
     status.textContent = '圖片已送入模型…';
   };
   img.onerror = () => { status.textContent = '無法讀取原圖'; depthWorker = null; };
-  img.src = 'assets/source-art.png';
+  img.src = manifest.source; // the selected scene's source art
 }
 
 /* ---------- HUD + interaction ---------- */
@@ -2062,20 +2330,12 @@ function bindHUD() {
   document.querySelectorAll('#insp-modes .btn').forEach((b) => {
     b.addEventListener('click', () => setInspectorMode(b.dataset.mode));
   });
-  // Layer toggles (built from the manifest).
-  const wrap = $('insp-layers');
-  for (const [id, info] of Object.entries(manifest.layers)) {
-    const label = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = true;
-    cb.addEventListener('change', () => {
-      setLayerVisible(id, cb.checked);
-      label.classList.toggle('off', !cb.checked);
-    });
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(id + ' z=' + info.z));
-    wrap.appendChild(label);
-  }
+  // Scene picker (Phase 2): switches scenes; the switch is async and
+  // keeps the current mood/sliders. A failed switch leaves the picker
+  // on the old scene (see switchScene).
+  $('sel-scene').addEventListener('change', () => { switchScene($('sel-scene').value); });
+  // Layer toggles are built per scene by buildLayerToggles() (called
+  // from loadScene); they are NOT built here.
   // Keyboard shortcuts.
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -2112,7 +2372,7 @@ function bindHUD() {
     if (!state.brush.active) return;
     const r = el.getBoundingClientRect();
     const px = (cx - r.left) / r.width * 1920, py = (cy - r.top) / r.height * 1080;
-    const hit = L.classifyTap(px, py);
+    const hit = L.classifyTap(px, py, state.sceneId);
     const now = performance.now();
     if (hit.kind === 'noren') {
       if (hit.panel !== state.brush.lastPanel || now - state.brush.lastAt > 90) {
@@ -2122,7 +2382,9 @@ function bindHUD() {
       }
     }
     if (hit.kind === 'steam') {
-      const bc = manifest.anchors.bowl_center;
+      // Swirl centre = the scene's steam source (bowl on ramen/matcha,
+      // cup on osaka, oden pot on shotengai). No bowl_center needed.
+      const bc = sceneDef.steam.src;
       const ang = Math.atan2(py - bc[1], px - bc[0]);
       if (state.brush.swirlAng != null) {
         let d = ang - state.brush.swirlAng;
@@ -2325,10 +2587,10 @@ function setInspectorMode(mode) {
   });
   const dv = $('depthview');
   if (mode === 'depth') {
-    dv.src = 'assets/depth.png';
+    dv.src = sceneDir + '/depth.png';
     dv.classList.remove('hidden');
   } else if (mode === 'original') {
-    dv.src = 'assets/source-art.png';
+    dv.src = manifest.source;
     dv.classList.remove('hidden');
   } else if (mode === 'masks') {
     // Masks grid: build a contact sheet from the 7 mask images.
@@ -2348,7 +2610,7 @@ function setInspectorMode(mode) {
         x.fillText(n.replace('mask-', ''), gx + 2, gy + ch + 14);
         if (++loaded === names.length) dv.src = c.toDataURL('image/png');
       };
-      im.src = 'assets/masks/' + n + '.png';
+      im.src = sceneDir + '/masks/' + n + '.png';
     });
     dv.classList.remove('hidden');
   } else {
@@ -2359,11 +2621,23 @@ function setInspectorMode(mode) {
   // No-Post mode is honoured in the render loop (scene renders direct).
 }
 function setLayerVisible(id, on) {
+  // The toggle must hide the mesh that actually holds the layer:
+  //  - the cloth layer hides its static plate AND its strips (ramen
+  //    layer2, shotengai layer3);
+  //  - a lantern layer hides its swing group, not the plate inside it
+  //    (the group's position carries the pivot offset);
+  //  - any OTHER layer hides its plate. Phase 2 (layer3 finding): the
+  //    old code hid the swing group for layer1/layer3 unconditionally,
+  //    which is only right when the layer IS a lantern group. On a
+  //    scene where layer3 is a plain plate (enoden's train, yasaka's
+  //    figure) the old branch would find no group and hide nothing —
+  //    the toggle would silently do nothing. The group branch now
+  //    applies only when a group actually exists for that layer.
   const apply = (mesh) => { if (mesh) mesh.visible = on; };
-  if (id === 'layer2') {
-    apply(plates['layer2']);
+  if (sceneDef.cloth && id === sceneDef.cloth.layer) {
+    apply(plates[id]);
     norenStrips.forEach((m) => { m.visible = on; });
-  } else if (id === 'layer1' || id === 'layer3') {
+  } else if ((id === 'layer1' || id === 'layer3') && lanternGroups.some((gr) => gr.userData.layerId === id)) {
     const g = lanternGroups.find((gr) => gr.userData.layerId === id);
     if (g) g.visible = on;
   } else {
@@ -2380,7 +2654,7 @@ function handleTap(cx, cy) {
   const r = renderer.domElement.getBoundingClientRect();
   const u = (cx - r.left) / r.width, v = (cy - r.top) / r.height; // v from top
   const px = u * 1920, py = v * 1080;
-  const hit = L.classifyTap(px, py);
+  const hit = L.classifyTap(px, py, state.sceneId);
   if (hit.kind === 'neon') {
     L.applySpark(state.sim, hit.sign);
     if (state.audioOn) AudioEngine.crackle();
@@ -2434,7 +2708,7 @@ function syncScene() {
     mesh.position.y = sh.y;
   }
   for (const strip of norenStrips) {
-    const sh = L.plateShift(0.15, px, py);
+    const sh = L.plateShift(clothZ, px, py);
     strip.position.x = sh.x;
     strip.position.y = sh.y;
     const panel = sim.noren[strip.userData.stripIndex];
@@ -2473,10 +2747,17 @@ function syncScene() {
     wm.uniforms.uGazeY.value = -state.pointer.y * 0.6;
     wm.uniforms.uWind.value = p.wind;
   }
-  // Emissive per-sign brightness.
+  // Emissive per-sign brightness. The sign count is per-scene (ramen
+  // has 5, matcha 1, yasaka 3) — guard the index, or syncScene throws
+  // every frame on any scene with fewer than 5 signs. Levels with no
+  // sign in the sign map are never read by the shader, so a steady 1
+  // for the missing ones is harmless.
   if (emissiveMat) {
     const u = emissiveMat.uniforms.uSigns.value;
-    for (let i = 0; i < 5; i++) u[i] = sim.signs[i].flicker * (0.55 + 0.45 * p.flicker) + sim.signs[i].spark * 2.0;
+    for (let i = 0; i < 5; i++) {
+      const sg = sim.signs[i];
+      u[i] = sg ? sg.flicker * (0.55 + 0.45 * p.flicker) + sg.spark * 2.0 : 1;
+    }
     u[5] = 0.9 + 0.1 * Math.sin(sim.t * 0.8);
     u[6] = 0.9 + 0.1 * Math.sin(sim.t * 0.8 + 2.0);
     emissiveMat.uniforms.uBrownout.value = sim.events.lightningEnv;
@@ -2669,12 +2950,23 @@ function loop(now) {
 }
 
 /* ---------- CSS fallback (no WebGL) ---------- */
-function startFallback() {
+async function startFallback() {
   $('loading').classList.add('hidden');
   $('app').classList.add('hidden');
   $('fallback').classList.remove('hidden');
   document.querySelectorAll('.hud').forEach((el) => el.classList.add('hidden'));
   toast('此裝置不支援 WebGL — 已切換為 CSS 視差模式');
+  // The fallback plates follow the saved scene (ramen if the manifest
+  // can't be read — WebGL2 is decided before the first scene loads).
+  try {
+    if (!manifest) {
+      sceneDef = L.sceneById(savedSceneId());
+      sceneDir = sceneDef.dir;
+      manifest = await loadSceneManifest(sceneDef);
+      state.sceneId = sceneDef.id;
+    }
+    buildFallbackImgs();
+  } catch (e) { /* keep the hardcoded ramen plates */ }
   const imgs = [...document.querySelectorAll('#fallback .fl')];
   const onMove = (cx, cy) => {
     const px = (cx / window.innerWidth) * 2 - 1;
@@ -2688,39 +2980,167 @@ function startFallback() {
   window.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
 }
 
-/* ---------- init ---------- */
-async function init() {
+/* ---------- scene switching (Phase 2) ---------- */
+function setProgress(f, m) {
   const bar = $('loadbar'), msg = $('loadmsg');
-  const setProgress = (f, m) => { bar.style.width = Math.round(f * 100) + '%'; if (m) msg.textContent = m; };
+  if (bar) bar.style.width = Math.round(f * 100) + '%';
+  if (m && msg) msg.textContent = m;
+}
+function disposeSceneGraph() {
+  // Free the previous scene's GPU resources before building the next
+  // one. postRT is deliberately NOT disposed — buildPost reuses it
+  // across switches (a new render target per switch would leak).
+  const disposeMaterial = (m) => {
+    if (!m) return;
+    if (m.uniforms) {
+      for (const u of Object.values(m.uniforms)) {
+        const v = u && u.value;
+        if (v && v.isTexture && v !== (postRT && postRT.texture)) v.dispose();
+      }
+    }
+    m.dispose();
+  };
+  const disposeObject = (obj) => {
+    if (!obj) return;
+    obj.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const mat of mats) disposeMaterial(mat);
+      }
+    });
+  };
+  if (scene) { disposeObject(scene); scene.clear(); }
+  if (water) {
+    if (!water.cpu) {
+      if (water.tA) water.tA.dispose();
+      if (water.tB) water.tB.dispose();
+      disposeObject(water.updateScene);
+    }
+    water = null;
+  }
+  if (postScene) { disposeObject(postScene); postScene = null; postMat = null; postCam = null; }
+  for (const k of Object.keys(textures)) {
+    const t = textures[k];
+    if (t && t.dispose) t.dispose();
+  }
+  textures = {};
+  plates = {}; norenStrips = []; lanternGroups = [];
+  steamMats = []; steamMeshes = []; mistMat = null; mistMesh = null;
+  streetMat = null; emissiveMat = null; rainLines = null; dripLines = null;
+  taxiGroup = null; flashQuad = null;
+}
+/* Layer toggles, rebuilt per scene (the layers differ per scene:
+   ramen has layer3-front-lantern, enoden layer3-train). */
+function buildLayerToggles() {
+  const wrap = $('insp-layers');
+  wrap.innerHTML = '';
+  for (const [id, info] of Object.entries(manifest.layers)) {
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    cb.addEventListener('change', () => {
+      setLayerVisible(id, cb.checked);
+      label.classList.toggle('off', !cb.checked);
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(id + ' z=' + info.z));
+    wrap.appendChild(label);
+  }
+}
+function updateSceneChrome() {
+  $('scene-title').innerHTML = sceneDef.title + ' <span>· 2.5D</span>';
+  document.title = sceneDef.title + ' · 2.5D Diorama';
+  $('sel-scene').value = sceneDef.id;
+  // Depth view + status reset to the new scene's offline depth map.
+  $('depth-status').textContent = '已載入離線深度圖';
+  $('depthview').classList.add('hidden');
+  if (state.inspMode !== 'final') setInspectorMode('final');
+  buildFallbackImgs();
+}
+/* CSS fallback plates (only visible when WebGL is unavailable):
+   rebuilt from the current scene's manifest, so the fallback follows
+   the saved scene instead of always showing ramen. */
+function buildFallbackImgs() {
+  const fb = $('fallback');
+  fb.querySelectorAll('.fl').forEach((im) => im.remove());
+  for (const [id, info] of Object.entries(manifest.layers)) {
+    const im = document.createElement('img');
+    im.className = 'fl';
+    im.dataset.z = String(info.z);
+    im.src = sceneDir + '/' + info.file;
+    im.alt = '';
+    fb.prepend(im);
+  }
+}
+async function loadScene(id) {
+  const def = L.sceneById(id);
+  const isFirst = !manifest;
   try {
+    $('loading').classList.remove('hidden');
     setProgress(0.05, '正在讀取場景資料…');
-    await loadManifest();
+    const m = await loadSceneManifest(def);
     const manager = new THREE.LoadingManager();
     manager.onProgress = (url, loaded, total) => setProgress(0.1 + 0.8 * (loaded / total), `正在載入圖層 ${loaded}/${total}…`);
-    const files = {
-      layer0: 'assets/layers/layer0-backdrop.png',
-      layer1: 'assets/layers/layer1-rear-lantern.png',
-      layer2: 'assets/layers/layer2-noren.png',
-      layer2static: 'assets/layers/layer2-static.png',
-      layer3: 'assets/layers/layer3-front-lantern.png',
-      layer4: 'assets/layers/layer4-woman-counter.png',
-      source: 'assets/source-art.png',
-      depth: 'assets/depth.png',
-      'mask-rain': 'assets/masks/mask-rain.png',
-      'mask-dry': 'assets/masks/mask-dry.png',
-      'mask-street': 'assets/masks/mask-street.png',
-      'mask-emissive': 'assets/masks/mask-emissive.png',
-      'mask-cloth': 'assets/masks/mask-cloth.png',
-      'mask-steam': 'assets/masks/mask-steam.png',
-      'mask-flame': 'assets/masks/mask-flame.png',
-    };
-    const entries = Object.entries(files);
-    for (const [k, url] of entries) textures[k] = await loadTexture(url, manager);
-    // Depth + masks are data textures: no sRGB.
-    for (const k of ['depth', 'mask-rain', 'mask-dry', 'mask-street', 'mask-emissive', 'mask-cloth', 'mask-steam', 'mask-flame']) {
-      textures[k].colorSpace = THREE.NoColorSpace;
+    const files = sceneTextureFiles(def, m);
+    // Lazy load: only this scene's assets are fetched (~7-9 MB). The
+    // other five scenes (~42 MB total) are never preloaded.
+    const nextTextures = {};
+    for (const [k, url] of Object.entries(files)) nextTextures[k] = await loadTexture(url, manager);
+    for (const k of Object.keys(nextTextures)) {
+      if (k === 'depth' || k.startsWith('mask-')) nextTextures[k].colorSpace = THREE.NoColorSpace;
     }
     setProgress(0.92, '正在建立場景…');
+    // Swap: dispose the old graph, then build the new one. The sim is
+    // recreated for the scene (noren count, drips, taxi) while the
+    // mood and sliders are preserved across the switch.
+    disposeSceneGraph();
+    manifest = m; sceneDef = def; sceneDir = def.dir; state.sceneId = def.id;
+    textures = nextTextures;
+    const mood = state.sim.mood, params = { ...state.sim.params };
+    state.sim = L.createSim(L.SEED, def.id);
+    state.sim.mood = mood; state.sim.params = params;
+    pendingImpulses.length = 0;
+    buildPlates();
+    buildLanterns();
+    buildWater();
+    buildStreet();
+    buildEmissive();
+    buildRainLines();
+    buildSteamMist();
+    buildTaxi();
+    buildPost();
+    buildLayerToggles();
+    updateSceneChrome();
+    try { localStorage.setItem(SCENE_STORAGE_KEY, def.id); } catch (e) {}
+    setProgress(1, '完成');
+    $('loading').classList.add('hidden');
+  } catch (err) {
+    console.error(err);
+    $('loading').classList.add('hidden');
+    if (!isFirst) toast('場景載入失敗：' + (err.message || err));
+    throw err;
+  }
+}
+async function switchScene(id) {
+  if (id === state.sceneId) return;
+  const prev = state.sceneId;
+  try {
+    await loadScene(id);
+    toast('已切換到「' + sceneDef.title + '」');
+  } catch (err) {
+    // A fetch/texture failure happens before the swap, so the old
+    // scene is intact — put the picker back on it.
+    $('sel-scene').value = prev;
+  }
+}
+
+/* ---------- init ---------- */
+async function init() {
+  try {
+    setProgress(0.05, '正在讀取場景資料…');
+    // Renderer first: bindHUD needs the canvas, and loadScene needs
+    // the renderer for the water render targets and the post pass.
     // Round 2: antialias OFF. The final pass is a fullscreen post quad,
     // so MSAA multiplies its fragment cost ~4x in software rendering
     // (fragment model at 1919x998: post 38.3M -> 9.6M fetches/frame)
@@ -2741,15 +3161,10 @@ async function init() {
       2 * Math.atan((L.PLANE_H / 2) / L.CAM_D) * 180 / Math.PI,
       window.innerWidth / window.innerHeight, 0.1, 20);
     camera.position.set(0, 0, L.CAM_D);
-    buildPlates();
-    buildLanterns();
-    buildWater();
-    buildStreet();
-    buildEmissive();
-    buildRainLines();
-    buildSteamMist();
-    buildTaxi();
-    buildPost();
+    // First scene: the saved one (localStorage), ramen by default.
+    // loadScene owns the loading overlay, the texture fetch, the graph
+    // build, and the inspector toggles.
+    await loadScene(savedSceneId());
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -2760,8 +3175,6 @@ async function init() {
     });
     bindHUD();
     applyMood('drizzle');
-    setProgress(1, '完成');
-    $('loading').classList.add('hidden');
     requestAnimationFrame(loop);
     setTimeout(() => toast('拖動滑鼠移動視角 · 點霓虹燈、撥門簾、戳水窪'), 600);
   } catch (err) {

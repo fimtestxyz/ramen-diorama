@@ -116,19 +116,34 @@ test('smoke: pure-sim frame budget (60 sim-seconds must run fast)', () => {
   assert.ok(ms < 3000, `3600 fixed steps took ${ms.toFixed(0)}ms (budget 3000ms)`);
 });
 
-test('structure: every manifest asset exists and is referenced by index.html', () => {
-  for (const info of Object.values(manifest.layers)) {
-    assert.ok(existsSync(path.join(root, 'assets', info.file)), `missing ${info.file}`);
-    assert.ok(html.includes(info.file), `index.html does not reference ${info.file}`);
+test('structure: every scene manifest asset exists on disk (all 6 scenes)', () => {
+  // Phase 2: paths are manifest-driven, so index.html no longer lists
+  // them literally. What is pinned instead: every file every manifest
+  // names exists, the registry lists all 6 scenes, and the app builds
+  // texture URLs from the manifest it fetched.
+  const scenes = L.SCENES;
+  assert.equal(scenes.length, 6, 'registry has 6 scenes');
+  // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
+  // Array prototype differs from this file's, so deepStrictEqual fails
+  // on identical contents.)
+  assert.equal(scenes.map((s) => s.id).join(','),
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka');
+  for (const def of scenes) {
+    const m = JSON.parse(readFileSync(path.join(root, def.dir, 'manifest.json'), 'utf8'));
+    const check = L.validateManifest(m);
+    assert.ok(check.ok, `${def.id} manifest invalid: ${check.errors.join('; ')}`);
+    for (const info of Object.values(m.layers)) {
+      assert.ok(existsSync(path.join(root, def.dir, info.file)), `${def.id}: missing ${info.file}`);
+    }
+    for (const info of Object.values(m.masks)) {
+      assert.ok(existsSync(path.join(root, def.dir, info.file)), `${def.id}: missing ${info.file}`);
+    }
+    assert.ok(existsSync(path.join(root, def.dir, 'depth.png')), `${def.id}: missing depth.png`);
+    assert.ok(existsSync(path.join(root, m.source)), `${def.id}: missing ${m.source}`);
   }
-  for (const info of Object.values(manifest.masks)) {
-    assert.ok(existsSync(path.join(root, 'assets', info.file)), `missing ${info.file}`);
-    assert.ok(html.includes(info.file), `index.html does not reference ${info.file}`);
-  }
-  for (const f of ['assets/source-art.png', 'assets/depth.png', 'assets/layers/layer2-static.png']) {
-    assert.ok(existsSync(path.join(root, f)), `missing ${f}`);
-    assert.ok(html.includes(f), `index.html does not reference ${f}`);
-  }
+  assert.ok(html.includes("fetch(def.dir + '/manifest.json')"), 'app fetches the per-scene manifest');
+  assert.ok(html.includes("files[id] = def.dir + '/' + info.file"), 'texture URLs come from the manifest');
+  assert.ok(html.includes("'layers/layer2-static.png'"), 'ramen cloth-static default literal');
 });
 
 test('structure: importmap pins three@0.187.0 on jsDelivr, no other CDN', () => {
@@ -278,8 +293,11 @@ test('round 2: quality tiers reduce fragment cost, and Auto shows the active tie
   // Lantern plates: alpha test discards their ~97-99% transparent
   // pixels after the fetch, so it saves the blend/overdraw cost (not
   // the texture fetch — the fetch happens first). The fetch saving is
-  // the woman discard above.
-  assert.ok(html.includes('alphaTest: 0.02'), 'lantern plates carry an alpha test');
+  // the woman discard above. Phase 2: the test is per-layer now
+  // (layer1/layer3 are lantern plates on ramen; on enoden they are a
+  // station and a train, so the test must not apply blindly).
+  assert.ok(html.includes("alphaTest: (id === 'layer1' || id === 'layer3') ? 0.02 : 0"),
+    'lantern plates carry an alpha test');
 });
 
 test('round 2: sliders respond to pointer commit as well as drag/keyboard', () => {
@@ -323,4 +341,49 @@ test('round 2: playlist UI is wired (panel, transport, auto-advance, attribution
   // The music panel is HUD chrome, so H hides it with everything else.
   assert.ok(panelAt > 0 && html.includes('id="music-panel" class="hud glass hidden"'),
     'music panel is hud chrome');
+});
+
+test('phase 2: layer toggle maps to the mesh that holds the layer (layer3 finding)', () => {
+  // The round-2 live re-test saw: unchecking layer3 removed the mist
+  // band, not the front lantern; the lantern vanished only with
+  // layer4. The shipped PNGs + code say otherwise (see the Python pin
+  // in test/slices.test.py): layer3's alpha is the lantern, and the
+  // mist plane is not in `plates` at all, so no toggle can hide it.
+  // The wiring that matters:
+  //  - buildLanterns pairs ramen layer1->rear, layer3->front (registry
+  //    pivots), so the layer3 swing group IS the lantern plate;
+  //  - setLayerVisible hides the swing group for a lantern layer, the
+  //    plate for any other layer — and the group branch now applies
+  //    only when a group actually exists for that layer (on enoden,
+  //    layer3 is the train plate, not a lantern, so the toggle must
+  //    hide the plate).
+  assert.ok(html.includes('for (const d of sceneDef.lanterns)'), 'lanterns built from the registry');
+  assert.ok(html.includes('group.userData.layerId = d.layer;'), 'swing group carries its layer id');
+  assert.ok(html.includes('lanternGroups.some((gr) => gr.userData.layerId === id)'),
+    'group branch applies only when a group exists for the layer');
+  assert.ok(html.includes('if (sceneDef.cloth && id === sceneDef.cloth.layer)'),
+    'cloth layer toggle hides the static plate + strips');
+  assert.ok(!html.includes("plates['mist']"), 'mist is not a plate');
+  assert.ok(html.includes('mist.userData.shiftZ = -0.2;'), 'mist shifts with the backdrop, not a layer');
+});
+
+test('phase 2: scene picker exists, switches scenes, persists the choice', () => {
+  assert.ok(html.includes('id="sel-scene"'), 'picker exists');
+  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka']) {
+    assert.ok(html.includes(`value="${id}"`), `picker lists ${id}`);
+  }
+  assert.ok(html.includes('async function loadScene(id)'), 'loadScene exists');
+  assert.ok(html.includes('async function switchScene(id)'), 'switchScene exists');
+  assert.ok(html.includes('localStorage.setItem(SCENE_STORAGE_KEY, def.id)'), 'choice is persisted');
+  assert.ok(html.includes('await loadScene(savedSceneId())'), 'first load uses the saved scene');
+  assert.ok(html.includes("const SCENE_STORAGE_KEY = 'ramen-diorama.scene'"), 'storage key is stable');
+  // Lazy loading: no scene assets are preloaded — only the selected
+  // scene's manifest + files are fetched, on demand.
+  assert.ok(!html.includes('rel="preload"'), 'no preload of scene assets');
+  assert.ok(html.includes('Lazy load: only this scene'), 'lazy-load is documented in loadScene');
+  // The depth worker re-estimates the SELECTED scene's source art.
+  assert.ok(html.includes('img.src = manifest.source;'), 'depth worker uses the current scene source');
+  // A switch disposes the old graph instead of leaking it.
+  assert.ok(html.includes('disposeSceneGraph();'), 'loadScene disposes the old graph');
+  assert.ok(html.includes('function disposeSceneGraph()'), 'dispose helper exists');
 });

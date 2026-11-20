@@ -552,3 +552,155 @@ slice tests pass** (incl. the fragment model: 21.7M vs 56.1M high/mid,
 - Re-check the round-1 fixes (rest alignment, parallax, depth,
   interactions, presets, shortcuts, H) still hold.
 
+
+## Phase 2 — multi-scene (2026-11-20, local only — not yet pushed or live-verified)
+
+User request 2026-11-20 ~16:08: five more Tokyo lo-fi scenes to switch
+between (Osaka kissaten, Kyoto machiya matcha house, Kamakura Enoden,
+Tokyo shitamachi street, Kyoto Yasaka pagoda). Phase 1 (art + depth +
+slice, 42 MB) was built and verified separately; this phase is the
+scene switcher in `index.html`.
+
+### Architecture
+
+- **Scene registry `SCENES` in the logic block** (6 entries: ramen +
+  5 scenes). Each entry carries: `id/name/title/dir`, `taxi` (ramen
+  only), `rig` (pivot + hair flag + blink sigma, or null), `cloth`
+  (layer + panels, or null), `lanterns` (swing defs, or `[]`), `signs`
+  (emissive tap boxes), `steam` (src/top/width/z/mist), `street`
+  (pixel rect), `drips` (awning band, or null). The registry is the
+  single source of truth for interaction geometry; the manifest is
+  the source of truth for render assets (layer/mask file names, z,
+  cloth_layer, static_file).
+- **Lazy loading.** Only the selected scene's assets are fetched
+  (~7–9 MB). The other five scenes (~42 MB total) are never
+  preloaded. `loadScene(id)`: fetch `dir/manifest.json`, validate,
+  fetch that scene's layers/masks/source/depth, dispose the old
+  scene graph (geometries, materials, textures, water render
+  targets — `postRT` is reused, not disposed), rebuild, persist the
+  choice in localStorage (`ramen-diorama.scene`). The mood and
+  sliders are preserved across a switch; the sim is recreated per
+  scene (noren count, drips, taxi). A fetch failure happens before
+  the swap, so the old scene stays intact and the picker resets to it.
+- **Picker.** `<select id="sel-scene">` in `#topbtns`, 6 Chinese
+  names; the page `<title>` and the HUD title follow the scene.
+- **Per-scene generalization.** Every ramen-hardcoded constant now
+  comes from the manifest or the registry: eyes/bowl/steam/lantern
+  pivots/counter_top_y/noren_rod/awning_drips, the street band
+  (`uStreetBand` uniform in the street shader — ramen (0, 0, 0.36,
+  0.3519) reproduces the old `tuv.x/0.36, tuv.y/0.352`), the post
+  brightening centre (the scene's steam source), the depth worker's
+  source art (`manifest.source`), the inspector depth/original/mask
+  paths (`sceneDir + ...`). The rig shader takes `uHair` and
+  `uBlinkSigma` uniforms (matcha's hair sits outside the shader's
+  hair UV zone, so it stays 0 there; the eye gaussian scales with
+  the eye separation — ramen 0.00045, matcha 0.00018, osaka 0.00024).
+- **Graceful degradation.** Scenes without ramen-style anchors do
+  not crash: no eyes → plain layer4 plate (no rig); no cloth →
+  no strips; no lanterns → no swing groups; no drips (osaka, an
+  interior) → no drip loop; no taxi → no taxi group. The sim's
+  `signs`/`lanterns` arrays are built from the registry per scene
+  (ramen 5/2, osaka 4/1, matcha 1/1, enoden 5/0, shotengai 5/0,
+  yasaka 4/0) — the old hardcoded `for (i < 5)` flicker loop and
+  `for (i < 2)` lantern loop would have thrown on the smaller
+  scenes. The emissive `uSigns` upload guards missing signs.
+- **Cloth layer.** Ramen's noren is on layer2 (2 panels, 6 strips);
+  shotengai's is on layer3 (3 panels, 9 strips, `cloth_layer:
+  "layer3"`, `static_file: "layers/layer3-static.png"`). The strip
+  rig, the static variant, and the layer toggle all read the
+  manifest's cloth layer. The other four scenes have no cloth.
+- **Lantern swing is explicit, not by layer.** Only ramen (2),
+  osaka (1, pendant lamps), and matcha (1, paper lantern) have
+  swing groups. Enoden's layer1/layer3 are a station building and
+  a train, yasaka's are the pagoda and the red-umbrella figure,
+  shotengai's layer3 is the izakaya block — none of them swing.
+
+### Bugs found while generalizing (both fixed in this phase)
+
+- **Steam mirrored to the top of the frame (ramen, latent since the
+  build).** `buildSteamMist` passed `bowlV = 1 - y/1080`
+  (texture-v, from the bottom) where `mkSteam` expects a frame
+  fraction from the top — the bowl steam sat at frame y≈44 instead
+  of just above the bowl (≈722). The ramen `mask-steam` bbox
+  (x 1316–1694, y 560–995) confirms the column runs from the bowl
+  (885) up to the steam top (560). Fix: pure `steamPlaneRect(steam)`
+  in RamenLogic — plane centred on the source/top midpoint, height
+  = (srcY − topY)/1080 — used by `buildSteamMist` for all scenes.
+  This CHANGES the ramen scene's steam placement (for the better,
+  per design intent) — live E2E must confirm the steam now sits
+  above the bowl. 1-line revert if the parent disagrees.
+- **Osaka lamp tap overlap (minor, known, not fixed).** The osaka
+  pendant-lamp centre (848,200) sits inside the window-glow sign
+  box [631,99,954,387], so tapping the lamp sparks the sign; the
+  tap circle's edge (960,200) is outside the box and swings the
+  lamp. The lamps still swing from wind; only the tap mapping
+  overlaps. Pinned in the tests.
+
+### layer3 finding (E2E #3 open item — investigated, not a bug)
+
+The live re-test reported: unchecking layer3 removed the low
+mist/fog band, not the big front lantern; the lantern vanished
+only with layer4. The evidence says the mapping is correct:
+
+- PNGs (measured): inside the front-lantern bbox (x 320–570,
+  y 0–362) layer3 is 82% opaque, layer4 is 0%, layer1 is 0%;
+  the street band (y 700–1080, x 0–691) has 0% layer4 alpha and
+  8.7% layer2 alpha. Pinned in `test/slices.test.py`.
+- Code: `setLayerVisible('layer3')` hides the layer3 swing group
+  (the lantern plate); `setLayerVisible('layer4')` hides only the
+  woman plate. The mist plane is NOT in `plates` — no layer
+  toggle can hide it. Pinned structurally in `test/smoke.mjs`.
+- Most likely explanation: E2E misattribution — the animated mist
+  noise plus the emissive glow overlay (additive, not tied to the
+  toggle) persisting after the lantern body hid.
+- Phase 2 also hardened the toggle: the lantern-group branch now
+  applies only when a swing group actually exists for that layer
+  (on enoden, layer3 is the train plate, not a lantern — the old
+  branch would have hidden nothing).
+- **Still needs a live re-check** to close it: toggle layer3 on
+  the live ramen scene and confirm the front lantern (not the
+  mist) disappears. Do NOT claim the E2E was wrong without it.
+
+### Per-scene fragment cost (same model as round 2, at 1919×998)
+
+| scene | before | high/mid | low | notes |
+|---|---|---|---|---|
+| ramen | 56.1M | 21.7M (39%) | 14.0M (25%) | rig, cov4 0.26 |
+| osaka-cafe | 55.5M | 22.8M (41%) | 15.2M (27%) | rig, cov4 0.48 |
+| kyoto-matcha | 55.5M | 21.5M (39%) | 13.8M (25%) | rig, cov4 0.31 |
+| kamakura-enoden | 47.9M | 19.2M (40%) | 11.5M (24%) | plain layer4 |
+| tokyo-shotengai | 48.3M | 19.5M (40%) | 11.9M (25%) | plain layer4, strips 0.20 |
+| kyoto-yasaka | 47.9M | 19.2M (40%) | 11.5M (24%) | plain layer4 |
+
+All scenes: high/mid < 45% of before, low < 30% — the quality
+tiers stay honest. Model in `test/scenes.test.py` (rig scenes use
+the CAS term `(1−cov4)+5·cov4`, non-rig use 1 fetch for layer4;
+strips term = cloth-layer coverage or 0). This is a fragment model,
+NOT a measured fps gain.
+
+### Tests after this phase
+
+- **48/48 JS** (`node --test test/*.test.mjs test/smoke.mjs`):
+  6 new logic tests (registry + ramen constants, steamPlaneRect,
+  classifyTap per scene, createSim per scene, validateManifest
+  eyeless, cloth layer) + 2 new smoke tests (layer3 wiring,
+  picker + loadScene + persistence + lazy load + dispose).
+- **Python**: `test/slices.test.py` (layer3 pin) + `test/scenes.test.py`
+  (per-scene fragment model) — all pass.
+- `node --check` passes on both script blocks.
+
+### Live E2E still to check for this phase (do NOT close it without this)
+
+- Switch to each of the 5 new scenes: loads, looks right, rest
+  alignment holds, parallax has no gaps, interactions respond
+  (tap the signs / brush the shotengai noren / splash the street /
+  swirl the steam), presets + sliders + inspector work per scene.
+- Ramen steam now sits above the bowl (the mirroring fix).
+- layer3 toggle on the live ramen scene: the front lantern (not
+  the mist) disappears.
+- Reload returns to the selected scene (localStorage).
+- No preload of all 42 MB on page open (network check).
+- fps on a real GPU per scene; the quality tiers still step down.
+- Mobile ~390 px (not testable in the cloud browser; do not claim
+  mobile works).
+- Re-check the round-2 items still hold (playlist, sliders, H).

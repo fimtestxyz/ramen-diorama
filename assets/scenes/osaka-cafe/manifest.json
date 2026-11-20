@@ -1,0 +1,102 @@
+{
+  "scene": "osaka-cafe",
+  "name": "Osaka retro kissaten",
+  "source": "assets/scenes/osaka-cafe/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.4009
+    },
+    "layer1": {
+      "file": "layers/layer1-neon.png",
+      "z": -0.05,
+      "coverage": 0.0438
+    },
+    "layer2": {
+      "file": "layers/layer2-window-frames.png",
+      "z": 0.15,
+      "coverage": 0.0534
+    },
+    "layer3": {
+      "file": "layers/layer3-lamps.png",
+      "z": 0.2,
+      "coverage": 0.0335
+    },
+    "layer4": {
+      "file": "layers/layer4-people-counter.png",
+      "z": 0.34,
+      "coverage": 0.4684
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.0534
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.5728
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0772
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.001
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.3558
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0211
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.0273
+    }
+  },
+  "anchors": {
+    "counter_top_y": 730,
+    "cup_center": [
+      1547,
+      675
+    ],
+    "eyes": [
+      [
+        1425,
+        600
+      ],
+      [
+        1500,
+        598
+      ]
+    ],
+    "lantern_front_pivot": [
+      848,
+      0
+    ],
+    "lantern_rear_pivot": [
+      741,
+      0
+    ],
+    "steam_top": [
+      1547,
+      580
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.464,
+    "p99": 11.86,
+    "max": 134.6
+  }
+}

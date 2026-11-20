@@ -390,3 +390,130 @@ test('round 2: playlist next/prev wrap around', () => {
   assert.equal(L.playlistPrev(0, 6), 5, 'prev before the first track wraps to the last');
   assert.equal(L.playlistPrev(3, 6), 2);
 });
+
+/* ------------------------------------------------------------------ */
+/* Phase 2 — multi-scene (scene switcher, per-scene anchors, cloth)    */
+/* ------------------------------------------------------------------ */
+
+test('phase 2: SCENES registry has 6 scenes; ramen reproduces the old constants', () => {
+  const scenes = L.SCENES;
+  assert.equal(scenes.length, 6);
+  // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
+  // Array prototype differs from this file's.)
+  assert.equal(scenes.map((s) => s.id).join(','),
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka');
+  const r = L.sceneById('ramen');
+  // Ramen is the old hardcoded geometry, verbatim.
+  assert.equal(r.street.x0, 0); assert.equal(r.street.y0, 700);
+  assert.equal(r.street.x1, 691.2); assert.equal(r.street.y1, 1080);
+  assert.equal(r.signs.length, 5);
+  assert.equal(r.signs[0].join(','), '15,330,185,450', 'OPEN sign is sign 0');
+  assert.equal(r.lanterns.length, 2);
+  assert.equal(r.lanterns[0].pivot.join(','), '1405,120', 'rear pivot');
+  assert.equal(r.lanterns[1].pivot.join(','), '445,0', 'front pivot');
+  assert.equal(r.cloth.layer, 'layer2');
+  assert.equal(r.cloth.panels.length, 2);
+  assert.equal(r.taxi, true);
+  // Unknown id falls back to ramen.
+  assert.equal(L.sceneById('nope').id, 'ramen');
+  assert.equal(L.sceneById().id, 'ramen');
+});
+
+test('phase 2: steamPlaneRect puts the steam above the source (ramen fix)', () => {
+  // The old code passed a texture-v (from the bottom) where a frame
+  // fraction from the top was expected, mirroring the bowl steam to
+  // the top of the frame (centre ~y=44). The fix centres the plane on
+  // the source/top midpoint: ramen bowl (1505,885), top (1520,560).
+  const r = L.steamPlaneRect(L.SCENES[0].steam);
+  assert.ok(Math.abs(r.cyV - 722.5 / 1080) < 1e-9, `steam centre y is 722.5, not 44: ${r.cyV * 1080}`);
+  assert.ok(Math.abs(r.hFrac - 325 / 1080) < 1e-9, `steam height is 325 px: ${r.hFrac * 1080}`);
+  assert.equal(r.wFrac, 0.16);
+  // Every scene's steam plane sits between its source and its top.
+  for (const def of L.SCENES) {
+    const p = L.steamPlaneRect(def.steam);
+    const midY = (def.steam.src[1] + def.steam.top[1]) / 2;
+    assert.ok(Math.abs(p.cyV * 1080 - midY) < 1e-9, `${def.id}: steam centre ${p.cyV * 1080} vs ${midY}`);
+    assert.ok(p.hFrac > 0, `${def.id}: steam has height`);
+  }
+});
+
+test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
+  // Shotengai noren is on layer3, 3 panels = 9 strips: left edge
+  // strip 0, middle strip 4, right panel strip 7. (400,400) hits the
+  // oden sign first — signs take precedence over the noren.
+  assert.equal(L.classifyTap(150, 400, 'tokyo-shotengai').panel, 0);
+  const n4 = L.classifyTap(280, 400, 'tokyo-shotengai');
+  assert.equal(n4.kind, 'noren'); assert.equal(n4.panel, 4);
+  const n7 = L.classifyTap(400, 500, 'tokyo-shotengai');
+  assert.equal(n7.kind, 'noren'); assert.equal(n7.panel, 7);
+  assert.equal(L.classifyTap(400, 400, 'tokyo-shotengai').kind, 'neon', 'oden sign beats the noren');
+  // Osaka lamps: the lamp centre (848,200) sits inside the window-glow
+  // sign box, so it sparks the sign; the tap circle's edge (960,200)
+  // is outside the box and swings the lamp.
+  assert.equal(L.classifyTap(848, 200, 'osaka-cafe').kind, 'neon');
+  const lamp = L.classifyTap(960, 200, 'osaka-cafe');
+  assert.equal(lamp.kind, 'lantern'); assert.equal(lamp.which, 0);
+  // Matcha paper lantern swings; the garden stone lantern is a sign.
+  const ml = L.classifyTap(234, 244, 'kyoto-matcha');
+  assert.equal(ml.kind, 'lantern'); assert.equal(ml.which, 0);
+  assert.equal(L.classifyTap(1520, 500, 'kyoto-matcha').kind, 'neon');
+  // Enoden's train is a static plate, not a tap target.
+  assert.equal(L.classifyTap(744, 586, 'kamakura-enoden').kind, 'none');
+  // Street band fx/fy are per-scene: osaka band x 950..1900, y 680..837.
+  const st = L.classifyTap(1425, 700, 'osaka-cafe');
+  assert.equal(st.kind, 'street');
+  assert.ok(Math.abs(st.fx - 0.5) < 1e-9);
+  assert.ok(Math.abs(st.fy - (1 - 20 / 157)) < 1e-9, `osaka street fy: ${st.fy}`);
+  const sb = L.classifyTap(1425, 837, 'osaka-cafe');
+  assert.ok(Math.abs(sb.fy - 0) < 1e-9, 'bottom of the osaka band is fy=0');
+  // Yasaka's slope is the full-width street band.
+  const ys = L.classifyTap(960, 700, 'kyoto-yasaka');
+  assert.equal(ys.kind, 'street');
+  assert.ok(Math.abs(ys.fx - 0.5) < 1e-9);
+});
+
+test('phase 2: createSim per scene (noren, drips, taxi, signs, lanterns)', () => {
+  const expect = {
+    ramen: { noren: 6, drips: 16, taxi: true, signs: 5, lanterns: 2 },
+    'osaka-cafe': { noren: 0, drips: 0, taxi: false, signs: 4, lanterns: 1 },
+    'kyoto-matcha': { noren: 0, drips: 16, taxi: false, signs: 1, lanterns: 1 },
+    'kamakura-enoden': { noren: 0, drips: 16, taxi: false, signs: 5, lanterns: 0 },
+    'tokyo-shotengai': { noren: 9, drips: 16, taxi: false, signs: 5, lanterns: 0 },
+    'kyoto-yasaka': { noren: 0, drips: 16, taxi: false, signs: 4, lanterns: 0 },
+  };
+  for (const [id, e] of Object.entries(expect)) {
+    const sim = L.createSim(20261120, id);
+    assert.equal(sim.noren.length, e.noren, `${id}: noren`);
+    assert.equal(sim.drips.length, e.drips, `${id}: drips (osaka is an interior)`);
+    assert.equal(sim.events.taxiAt === Infinity, !e.taxi, `${id}: taxi scheduled only for ramen`);
+    assert.equal(sim.signs.length, e.signs, `${id}: signs`);
+    assert.equal(sim.lanterns.length, e.lanterns, `${id}: lanterns`);
+    // The sim steps without throwing for every scene (200 steps).
+    for (let i = 0; i < 200; i++) L.stepSim(sim);
+  }
+});
+
+test('phase 2: validateManifest accepts eyeless scenes, still rejects 1 eye', () => {
+  for (const id of ['kyoto-yasaka', 'tokyo-shotengai', 'kamakura-enoden']) {
+    const dir = L.sceneById(id).dir;
+    const m = JSON.parse(readFileSync(path.join(root, dir, 'manifest.json'), 'utf8'));
+    assert.equal(L.validateManifest(m).ok, true, `${id} manifest should pass without eyes`);
+  }
+  const bad = JSON.parse(JSON.stringify(manifest));
+  bad.anchors.eyes = [[1600, 520]];
+  assert.equal(L.validateManifest(bad).ok, false, 'one eye still fails');
+});
+
+test('phase 2: cloth layer is per-scene (ramen layer2, shotengai layer3, none elsewhere)', () => {
+  assert.equal(L.sceneById('ramen').cloth.layer, 'layer2');
+  assert.equal(L.sceneById('tokyo-shotengai').cloth.layer, 'layer3');
+  assert.equal(L.sceneById('tokyo-shotengai').cloth.panels.length, 3);
+  for (const id of ['osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'kyoto-yasaka']) {
+    assert.equal(L.sceneById(id).cloth, null, `${id} has no cloth`);
+  }
+  // The manifests agree with the registry.
+  for (const id of ['ramen', 'tokyo-shotengai']) {
+    const m = JSON.parse(readFileSync(path.join(root, L.sceneById(id).dir, 'manifest.json'), 'utf8'));
+    assert.equal(m.cloth_layer || 'layer2', L.sceneById(id).cloth.layer, `${id}: manifest cloth_layer matches registry`);
+  }
+});

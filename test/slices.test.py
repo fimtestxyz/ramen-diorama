@@ -175,6 +175,34 @@ def main():
           f"({after_low / before:.0%} of before)",
           after_low < before * 0.30, f"ratio {after_low / before:.2f}")
 
+    print("phase 2: layer3 holds the front lantern (E2E #3 pin)")
+    # The round-2 live re-test reported that unchecking layer3 removed
+    # the mist band, not the front lantern. The shipped PNGs say the
+    # lantern lives on layer3: inside the front-lantern bbox
+    # (x 320-570, y 0-362) layer3 is 82% opaque and layer4 is 0%;
+    # the street band has no layer4 alpha either. The mist plane is
+    # not a plate at all (a separate mesh with shiftZ -0.2), so no
+    # layer toggle can hide it — the E2E observation was a
+    # misattribution (animated mist + the emissive glow persisting
+    # after the lantern body hid). A live re-check is still needed to
+    # close it (see CLAUDE.md).
+    a3 = np.asarray(Image.open(os.path.join(
+        ASSETS, "layers", "layer3-front-lantern.png")).convert("RGBA"))[:, :, 3]
+    a4 = np.asarray(Image.open(os.path.join(
+        ASSETS, "layers", "layer4-woman-counter.png")).convert("RGBA"))[:, :, 3]
+    a2 = np.asarray(Image.open(os.path.join(
+        ASSETS, "layers", "layer2-noren.png")).convert("RGBA"))[:, :, 3]
+    check("front-lantern bbox is opaque on layer3",
+          float((a3[0:362, 320:570] > 3).mean()) > 0.8,
+          f"cov {float((a3[0:362, 320:570] > 3).mean()):.3f}")
+    check("front-lantern bbox is transparent on layer4",
+          float((a4[0:362, 320:570] > 3).mean()) == 0)
+    check("street band has no layer4 alpha",
+          float((a4[700:1080, 0:691] > 3).mean()) == 0)
+    check("street band has layer2 alpha (noren over the street edge)",
+          float((a2[700:1080, 0:691] > 3).mean()) > 0.05,
+          f"cov {float((a2[700:1080, 0:691] > 3).mean()):.3f}")
+
     print()
     if failures:
         print(f"{len(failures)} FAILURES: {failures}")

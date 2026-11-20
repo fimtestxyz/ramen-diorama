@@ -1,0 +1,102 @@
+{
+  "scene": "kyoto-matcha",
+  "name": "Kyoto machiya green-tea house",
+  "source": "assets/scenes/kyoto-matcha/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.456
+    },
+    "layer1": {
+      "file": "layers/layer1-stone-lanterns.png",
+      "z": -0.05,
+      "coverage": 0.0125
+    },
+    "layer2": {
+      "file": "layers/layer2-lattice.png",
+      "z": 0.15,
+      "coverage": 0.2169
+    },
+    "layer3": {
+      "file": "layers/layer3-paper-lantern.png",
+      "z": 0.2,
+      "coverage": 0.0216
+    },
+    "layer4": {
+      "file": "layers/layer4-woman-table.png",
+      "z": 0.34,
+      "coverage": 0.2929
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.2169
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.6146
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0341
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.001
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.2069
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0246
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.0374
+    }
+  },
+  "anchors": {
+    "bowl_center": [
+      900,
+      731
+    ],
+    "counter_top_y": 750,
+    "eyes": [
+      [
+        741,
+        375
+      ],
+      [
+        806,
+        370
+      ]
+    ],
+    "lantern_front_pivot": [
+      234,
+      0
+    ],
+    "lantern_rear_pivot": [
+      1556,
+      430
+    ],
+    "steam_top": [
+      900,
+      560
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.333,
+    "p99": 8.28,
+    "max": 114.1
+  }
+}

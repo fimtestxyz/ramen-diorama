@@ -1,0 +1,98 @@
+{
+  "scene": "kamakura-enoden",
+  "name": "Kamakura Enoden seaside station",
+  "source": "assets/scenes/kamakura-enoden/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.4406
+    },
+    "layer1": {
+      "file": "layers/layer1-far-station.png",
+      "z": -0.05,
+      "coverage": 0.021
+    },
+    "layer2": {
+      "file": "layers/layer2-roof.png",
+      "z": 0.15,
+      "coverage": 0.1681
+    },
+    "layer3": {
+      "file": "layers/layer3-train.png",
+      "z": 0.2,
+      "coverage": 0.1753
+    },
+    "layer4": {
+      "file": "layers/layer4-platform.png",
+      "z": 0.34,
+      "coverage": 0.1951
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.1681
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.1787
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0074
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.0014
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.3883
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0565
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.1384
+    }
+  },
+  "anchors": {
+    "counter_top_y": 800,
+    "eyes": [
+      [
+        1210,
+        478
+      ],
+      [
+        1230,
+        478
+      ]
+    ],
+    "lantern_front_pivot": [
+      1290,
+      180
+    ],
+    "lantern_rear_pivot": [
+      900,
+      260
+    ],
+    "steam_top": [
+      400,
+      400
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.213,
+    "p99": 5.4,
+    "max": 133.2
+  }
+}

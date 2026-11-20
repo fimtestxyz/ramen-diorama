@@ -22,14 +22,19 @@ rest alignment, compare, parallax with no gaps, depth model download
 toggles, all shortcuts incl. the fixed H, no console errors.
 **The only failure left: fps stuck at 4–5** (software WebGL, no GPU),
 manual Low produced no improvement, Auto never visibly stepped down.
-**Fix round 2 + lo-fi playlist are done locally (not yet pushed, not
-yet re-verified live)** — see "Fix round 2" in `spec.md` for the
-diagnosis (the fps meter floored at 4 fps; the tiers did not reduce
-the dominant fragment cost) and the playlist. Headless tests: 40 JS
-tests (`node --test test/*.test.mjs test/smoke.mjs`) + Python slice
-tests — all passing. Source art `assets/source-art.png`, 1920×1080,
-original illustration. All features implemented in `index.html`
-(~115 KB, single file, no build step).
+**Fix round 2 + lo-fi playlist were pushed (`73bbae6` + `78bc84b`)
+and live re-tested 16:01–16:14: round-2 features shippable** —
+fps meter truthful, Auto steps down visibly, playlist fully
+working, sliders fixed by pointer drag; cloud browser still 2–7 fps
+(software WebGL, no GPU — real-GPU fps unmeasured). **5 new scenes:
+Phase 1 (art + depth + slice, 42 MB) done and verified; Phase 2
+(scene switcher in the HUD, per-scene anchors, layer3 check) done
+locally, not yet pushed, not yet live-verified** — see "Phase 2" in
+`spec.md`. Headless tests: 48 JS tests (`node --test
+test/*.test.mjs test/smoke.mjs`) + Python slice/scene tests — all
+passing. Source art `assets/source-art.png`, 1920×1080, original
+illustration. All features implemented in `index.html` (~136 KB,
+single file, no build step).
 
 ## Pipeline
 
@@ -57,7 +62,7 @@ never leave the device.
 ## Files
 
 - `spec.md` — the spec (decisions, features, acceptance criteria)
-- `index.html` — the whole app (~115 KB: pure-logic `RamenLogic` block +
+- `index.html` — the whole app (~136 KB: pure-logic `RamenLogic` block +
   Three.js app module; importmap pins `three@0.187.0` on jsDelivr)
 - `assets/source-art.png` — the source illustration (1920×1080)
 - `assets/depth.png` — Depth Anything V2 Small depth map (1920×1080,
@@ -72,9 +77,15 @@ never leave the device.
 - `scripts/depth.py` — offline depth generation (Python onnxruntime;
   see note in spec.md — the Node route failed, same weights)
 - `scripts/slice.py` — offline slicing + inpainting (Python + OpenCV)
-- `test/` — `logic.test.mjs` (22), `smoke.mjs` (18, jittered cadence),
+- `test/` — `logic.test.mjs` (28), `smoke.mjs` (20, jittered cadence),
   `slices.test.py` (Python, layers/masks/manifest/depth/composite/
-  fragment model)
+  fragment model/layer3 pin), `scenes.test.py` (Python, the 5 new
+  scenes + per-scene fragment model)
+- `assets/scenes/` — 5 new scenes (osaka-cafe, kyoto-matcha,
+  kamakura-enoden, tokyo-shotengai, kyoto-yasaka), each with
+  source-art.png + depth.png + 5 layers + 7 masks + manifest.json
+  (42 MB total); `scripts/scenes.json` + `scripts/slice_scene.py`
+  drive them
 - `CLAUDE.md` — agent notes for this repo
 
 ## Measured numbers (build, 2026-11-20)
@@ -95,7 +106,7 @@ never leave the device.
 - Sim: 3600 fixed steps (60 sim-seconds) run in ~1.2–1.8 s wall on this
   throttled 1.5-CPU VM (~33× faster than real time). Rain produces
   100+ splashes per 60 s of drizzle (was 0 before the stepRain fix).
-- Tests: 40/40 JS + all Python slice tests pass (see `test/`).
+- Tests: 48/48 JS + all Python slice + scene tests pass (see `test/`).
 - Performance (fix round 2, 2026-11-20 — fragment model at 1919×998,
   from measured layer alpha coverages; NOT a measured fps gain):
   before 56.1M texture fetches/frame → 21.7M at high/mid tier (39%),
