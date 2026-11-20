@@ -36,7 +36,10 @@ jobs:
       - name: Run tests
         run: |
           if [ -d test ] && ls test/*.test.mjs >/dev/null 2>&1; then
-            node --test test/*.test.mjs
+            # Round 1 fix: the shell glob test/*.test.mjs does NOT match
+            # test/smoke.mjs, so the smoke suite (incl. the index.html
+            # structural checks) was never run by CI. Name it explicitly.
+            node --test test/*.test.mjs test/smoke.mjs
           else
             echo "no tests yet"
           fi
