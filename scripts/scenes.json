@@ -1,23 +1,401 @@
 {
   "notes": "Per-scene slicing config for the 5 new diorama scenes. Coordinates are in the 1920x1080 frame, measured from the generated source art. Larger depth = nearer (0-255). Layer priority (topmost wins): layer4 > layer3 > layer2 > layer1 > layer0 (backdrop). Shapes: {\"e\": [cx,cy,rx,ry]} ellipse, {\"r\": [x0,y0,x1,y1]} rect, {\"p\": [[x,y],...]} polygon. Masks mirror the ramen scene's 7 stencils; 'cloth' is the cloth element of the scene (noren/curtains/lattice), wherever it lives. 'static_file' is the cloth layer with its panels punched out (for the strip rig); null when the scene has no cloth strips.",
   "scenes": {
+    "gero-onsen": {
+      "anchors": {
+        "bath_center": [
+          500,
+          800
+        ],
+        "bath_mid": [
+          900,
+          830
+        ],
+        "lantern_left": [
+          260,
+          545
+        ],
+        "lantern_right": [
+          1630,
+          650
+        ],
+        "steam_top": [
+          500,
+          340
+        ],
+        "street_band": [
+          0,
+          700,
+          1920,
+          1080
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 100,
+          "name": "bath water is near",
+          "rect": [
+            600,
+            750,
+            1400,
+            950
+          ]
+        },
+        {
+          "mean_gt": 150,
+          "name": "foreground rocks are nearest",
+          "rect": [
+            300,
+            950,
+            1600,
+            1080
+          ]
+        },
+        {
+          "mean_lt": 10,
+          "name": "sky is far",
+          "rect": [
+            900,
+            0,
+            1500,
+            120
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.0,
+        "interior_rect": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "notes": "blend 0: pure Laplace fill. The patch is kept only because the slicer requires it; the sunset-sky patch is smooth and the texture is never blended in.",
+        "patch": [
+          100,
+          200,
+          1000,
+          1300
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-far-mountains.png",
+          "shapes": [
+            {
+              "r": [
+                800,
+                40,
+                1920,
+                430
+              ]
+            },
+            {
+              "r": [
+                950,
+                420,
+                1920,
+                620
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              0,
+              1200,
+              520
+            ],
+            "threshold": 20
+          },
+          "file": "layer2-fence-trees.png",
+          "shapes": [
+            {
+              "p": [
+                [
+                  0,
+                  400
+                ],
+                [
+                  600,
+                  420
+                ],
+                [
+                  1000,
+                  455
+                ],
+                [
+                  1400,
+                  485
+                ],
+                [
+                  1920,
+                  505
+                ],
+                [
+                  1920,
+                  700
+                ],
+                [
+                  1400,
+                  665
+                ],
+                [
+                  1000,
+                  640
+                ],
+                [
+                  600,
+                  600
+                ],
+                [
+                  0,
+                  640
+                ]
+              ]
+            },
+            {
+              "e": [
+                1750,
+                375,
+                110,
+                85
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "close": 9,
+          "file": "layer3-lanterns.png",
+          "shapes": [
+            {
+              "e": [
+                260,
+                545,
+                95,
+                120
+              ]
+            },
+            {
+              "e": [
+                1630,
+                650,
+                75,
+                105
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              600,
+              1920,
+              1080
+            ],
+            "threshold": 150
+          },
+          "file": "layer4-foreground-bath.png",
+          "shapes": [
+            {
+              "e": [
+                900,
+                840,
+                720,
+                190
+              ]
+            },
+            {
+              "r": [
+                340,
+                590,
+                620,
+                790
+              ]
+            },
+            {
+              "r": [
+                0,
+                980,
+                1920,
+                1080
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "poly",
+          "poly": [
+            [
+              0,
+              0
+            ],
+            [
+              700,
+              0
+            ],
+            [
+              750,
+              500
+            ],
+            [
+              0,
+              550
+            ]
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                255,
+                555,
+                70,
+                60
+              ]
+            },
+            {
+              "e": [
+                1630,
+                650,
+                60,
+                55
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              250,
+              555
+            ],
+            [
+              1630,
+              648
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "below": 150,
+          "kind": "depth_rect",
+          "rect": [
+            0,
+            200,
+            1920,
+            1080
+          ]
+        },
+        "mask-steam": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                500,
+                470,
+                140,
+                140
+              ]
+            },
+            {
+              "p": [
+                [
+                  450,
+                  350
+                ],
+                [
+                  560,
+                  350
+                ],
+                [
+                  650,
+                  800
+                ],
+                [
+                  380,
+                  800
+                ]
+              ]
+            },
+            {
+              "e": [
+                900,
+                730,
+                350,
+                110
+              ]
+            },
+            {
+              "e": [
+                1550,
+                680,
+                120,
+                90
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              0,
+              700
+            ],
+            [
+              1920,
+              700
+            ],
+            [
+              1920,
+              1080
+            ],
+            [
+              0,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Gero rotenburo outdoor onsen at dusk",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "bath_center",
+        "steam_top",
+        "lantern_left",
+        "lantern_right",
+        "street_band"
+      ]
+    },
     "hakodate-goryokaku": {
       "anchors": {
-        "office_center": [
-          915,
-          350
-        ],
-        "pavilion": [
-          803,
-          353
-        ],
         "annex": [
           710,
           420
-        ],
-        "mid_building": [
-          1067,
-          460
         ],
         "big_pine": [
           1370,
@@ -26,6 +404,18 @@
         "bridge": [
           1040,
           540
+        ],
+        "mid_building": [
+          1067,
+          460
+        ],
+        "office_center": [
+          915,
+          350
+        ],
+        "pavilion": [
+          803,
+          353
         ],
         "street_band": [
           0,
@@ -373,6 +763,609 @@
         "office_center",
         "big_pine",
         "bridge",
+        "street_band"
+      ]
+    },
+    "himeji-cafe": {
+      "anchors": {
+        "castle_center": [
+          1410,
+          440
+        ],
+        "counter_top_y": 720,
+        "cup_center": [
+          945,
+          805
+        ],
+        "cup_left": [
+          455,
+          860
+        ],
+        "cup_right": [
+          1335,
+          760
+        ],
+        "lamp_a": [
+          195,
+          75
+        ],
+        "lamp_b": [
+          735,
+          210
+        ],
+        "lamp_c": [
+          1160,
+          95
+        ],
+        "lamp_d": [
+          1355,
+          180
+        ],
+        "lamp_e": [
+          1570,
+          245
+        ],
+        "lamp_f": [
+          1815,
+          225
+        ],
+        "lamp_front_pivot": [
+          195,
+          0
+        ],
+        "lamp_g": [
+          935,
+          280
+        ],
+        "lamp_rear_pivot": [
+          935,
+          0
+        ],
+        "steam_top": [
+          945,
+          600
+        ],
+        "street_band": [
+          990,
+          620,
+          1920,
+          690
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 150,
+          "name": "counter is near",
+          "rect": [
+            100,
+            900,
+            1200,
+            1060
+          ]
+        },
+        {
+          "mean_lt": 40,
+          "name": "sky through window is far",
+          "rect": [
+            1050,
+            250,
+            1250,
+            350
+          ]
+        },
+        {
+          "mean_lt": 10,
+          "name": "castle is farthest",
+          "rect": [
+            1300,
+            380,
+            1520,
+            500
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.0,
+        "interior_rect": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "notes": "blend 0: pure Laplace fill. Patch is dusk sky through the window (smooth gradient); kept only because the slicer requires it.",
+        "patch": [
+          260,
+          340,
+          1050,
+          1250
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-far-castle.png",
+          "shapes": [
+            {
+              "r": [
+                995,
+                235,
+                1920,
+                690
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "file": "layer2-window-frames.png",
+          "notes": "window frame posts, mullions and pane dividers measured from the art; the left small-pane section is a 2x3 grid (vertical at x~1100), the right section is a single column",
+          "shapes": [
+            {
+              "r": [
+                975,
+                230,
+                1010,
+                700
+              ]
+            },
+            {
+              "r": [
+                975,
+                230,
+                1920,
+                265
+              ]
+            },
+            {
+              "r": [
+                1195,
+                260,
+                1225,
+                690
+              ]
+            },
+            {
+              "r": [
+                1685,
+                240,
+                1715,
+                690
+              ]
+            },
+            {
+              "r": [
+                975,
+                680,
+                1920,
+                705
+              ]
+            },
+            {
+              "r": [
+                1095,
+                260,
+                1110,
+                690
+              ]
+            },
+            {
+              "r": [
+                1000,
+                375,
+                1200,
+                390
+              ]
+            },
+            {
+              "r": [
+                1000,
+                515,
+                1200,
+                530
+              ]
+            },
+            {
+              "r": [
+                1715,
+                355,
+                1920,
+                370
+              ]
+            },
+            {
+              "r": [
+                1715,
+                505,
+                1920,
+                520
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "file": "layer3-lamps-shelves.png",
+          "notes": "back-wall shelving + panelled wall + under-window wall; 7 hanging lamps (A top-left conical shade, B centre conical, C/D/E/F round paper lanterns, G small centre lamp). Lamp ellipses verified against a PIL overlay drawn on the art.",
+          "shapes": [
+            {
+              "r": [
+                0,
+                0,
+                975,
+                780
+              ]
+            },
+            {
+              "r": [
+                985,
+                705,
+                1920,
+                780
+              ]
+            },
+            {
+              "r": [
+                1012,
+                595,
+                1190,
+                690
+              ]
+            },
+            {
+              "r": [
+                1690,
+                540,
+                1920,
+                790
+              ]
+            },
+            {
+              "e": [
+                195,
+                75,
+                135,
+                75
+              ]
+            },
+            {
+              "e": [
+                735,
+                210,
+                58,
+                60
+              ]
+            },
+            {
+              "e": [
+                1160,
+                95,
+                78,
+                88
+              ]
+            },
+            {
+              "e": [
+                1355,
+                180,
+                68,
+                76
+              ]
+            },
+            {
+              "e": [
+                1570,
+                245,
+                60,
+                74
+              ]
+            },
+            {
+              "e": [
+                1815,
+                225,
+                68,
+                72
+              ]
+            },
+            {
+              "e": [
+                935,
+                280,
+                38,
+                48
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              690,
+              1920,
+              1080
+            ],
+            "threshold": 120
+          },
+          "file": "layer4-foreground-counter.png",
+          "notes": "counter top + front; cup ellipses for the 3 cups, pitcher and sugar jar (their depth means are only ~82-86, below the 120 assist threshold, so they need explicit shapes). depth_assist threshold 120 is safe: only 0.7% of the wall strip y690-780 exceeds it.",
+          "shapes": [
+            {
+              "p": [
+                [
+                  0,
+                  780
+                ],
+                [
+                  1150,
+                  700
+                ],
+                [
+                  1920,
+                  715
+                ],
+                [
+                  1920,
+                  1080
+                ],
+                [
+                  0,
+                  1080
+                ]
+              ]
+            },
+            {
+              "e": [
+                455,
+                860,
+                145,
+                95
+              ]
+            },
+            {
+              "e": [
+                945,
+                805,
+                110,
+                80
+              ]
+            },
+            {
+              "e": [
+                1335,
+                760,
+                95,
+                70
+              ]
+            },
+            {
+              "e": [
+                1475,
+                755,
+                60,
+                65
+              ]
+            },
+            {
+              "e": [
+                1605,
+                750,
+                50,
+                55
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "union",
+          "parts": [
+            {
+              "kind": "rect",
+              "rect": [
+                0,
+                0,
+                975,
+                1080
+              ]
+            },
+            {
+              "kind": "rect",
+              "rect": [
+                975,
+                0,
+                1920,
+                230
+              ]
+            },
+            {
+              "kind": "rect",
+              "rect": [
+                975,
+                705,
+                1920,
+                1080
+              ]
+            }
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                195,
+                75,
+                135,
+                75
+              ]
+            },
+            {
+              "e": [
+                735,
+                210,
+                58,
+                60
+              ]
+            },
+            {
+              "e": [
+                1160,
+                95,
+                78,
+                88
+              ]
+            },
+            {
+              "e": [
+                1355,
+                180,
+                68,
+                76
+              ]
+            },
+            {
+              "e": [
+                1570,
+                245,
+                60,
+                74
+              ]
+            },
+            {
+              "e": [
+                1815,
+                225,
+                68,
+                72
+              ]
+            },
+            {
+              "e": [
+                935,
+                280,
+                38,
+                48
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              195,
+              75
+            ],
+            [
+              735,
+              210
+            ],
+            [
+              1160,
+              95
+            ],
+            [
+              1355,
+              180
+            ],
+            [
+              1570,
+              245
+            ],
+            [
+              1815,
+              225
+            ],
+            [
+              935,
+              280
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "below": 40,
+          "kind": "depth_rect",
+          "rect": [
+            985,
+            230,
+            1920,
+            700
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                945,
+                690,
+                110,
+                130
+              ]
+            },
+            {
+              "e": [
+                455,
+                730,
+                90,
+                80
+              ]
+            },
+            {
+              "e": [
+                1335,
+                680,
+                75,
+                60
+              ]
+            }
+          ]
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              990,
+              620
+            ],
+            [
+              1920,
+              620
+            ],
+            [
+              1920,
+              690
+            ],
+            [
+              990,
+              690
+            ]
+          ]
+        }
+      },
+      "name": "Warm Himeji kissaten interior, castle through the window",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "cup_center",
+        "steam_top",
+        "lamp_front_pivot",
+        "lamp_rear_pivot",
+        "counter_top_y",
         "street_band"
       ]
     },
@@ -1890,6 +2883,7 @@
         },
         "layer2": {
           "file": "layer2-window-frames.png",
+          "notes": "mullions measured from a 1.5x zoom of the window wall; center mullion slants right with perspective so it is a polygon, not a rect",
           "shapes": [
             {
               "r": [
@@ -1936,8 +2930,7 @@
               ]
             }
           ],
-          "z": 0.15,
-          "notes": "mullions measured from a 1.5x zoom of the window wall; center mullion slants right with perspective so it is a polygon, not a rect"
+          "z": 0.15
         },
         "layer3": {
           "file": "layer3-lamps.png",

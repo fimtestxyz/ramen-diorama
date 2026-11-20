@@ -400,13 +400,13 @@ test('round 2: playlist next/prev wrap around', () => {
 /* Phase 2 — multi-scene (scene switcher, per-scene anchors, cloth)    */
 /* ------------------------------------------------------------------ */
 
-test('phase 2: SCENES registry has 7 scenes; ramen reproduces the old constants', () => {
+test('phase 2: SCENES registry has 9 scenes; ramen reproduces the old constants', () => {
   const scenes = L.SCENES;
-  assert.equal(scenes.length, 7);
+  assert.equal(scenes.length, 9);
   // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
   // Array prototype differs from this file's.)
   assert.equal(scenes.map((s) => s.id).join(','),
-    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku');
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku,himeji-cafe,gero-onsen');
   const r = L.sceneById('ramen');
   // Ramen is the old hardcoded geometry, verbatim.
   assert.equal(r.street.x0, 0); assert.equal(r.street.y0, 700);
@@ -600,6 +600,8 @@ test('phase 2: createSim per scene (noren, drips, taxi, signs, lanterns)', () =>
     'tokyo-shotengai': { noren: 9, drips: 16, taxi: false, signs: 5, lanterns: 0 },
     'kyoto-yasaka': { noren: 0, drips: 16, taxi: false, signs: 4, lanterns: 0 },
     'hakodate-goryokaku': { noren: 0, drips: 0, taxi: false, signs: 4, lanterns: 0, snow: 250 },
+    'himeji-cafe': { noren: 0, drips: 0, taxi: false, signs: 7, lanterns: 0 },
+    'gero-onsen': { noren: 0, drips: 0, taxi: false, signs: 2, lanterns: 0 },
   };
   for (const [id, e] of Object.entries(expect)) {
     const sim = L.createSim(20261120, id);
@@ -709,6 +711,8 @@ test('i18n: scene names translate in all three languages', () => {
     'tokyo-shotengai': ['東京下町商店街', 'Tokyo Shitamachi Street', '東京下町商店街'],
     'kyoto-yasaka': ['京都八坂塔', 'Kyoto Yasaka Pagoda', '京都八坂の塔'],
     'hakodate-goryokaku': ['函館五稜郭雪夜', 'Hakodate Goryokaku Snow', '函館五稜郭'],
+    'himeji-cafe': ['姬路咖啡館', 'Himeji Cafe', '姫路カフェ'],
+    'gero-onsen': ['下呂溫泉', 'Gero Onsen', '下呂温泉'],
   };
   for (const [id, names] of Object.entries(expected)) {
     assert.equal(L.sceneName(id, 'zh'), names[0], `${id} zh`);
@@ -802,4 +806,16 @@ test('snow: createSim wires flakes only for hakodate; stepSim runs the fall', ()
   sim3.params = { ...L.MOODS.snow };
   for (let i = 0; i < 60; i++) L.stepSim(sim3);
   assert.equal(sim3.snow.length, 0, 'ramen never grows flakes, even on the snow preset');
+});
+
+test('seam fix (2026-11-21): parallax amplitude clamped at 0.12, idle drift returns to centre', () => {
+  // A layer-boundary gap opens ~203·px wide (layer2↔backdrop), so an
+  // unclamped px leaves a visible blurred band; 0.12 keeps the worst
+  // band ≈38 px. The old idle drift rocked the pointer (tx amplitude
+  // 0.55, px up to ±0.44), so the tester never saw a true still frame.
+  assert.ok(html.includes('Math.min(0.12, px)'), 'syncScene clamps px at 0.12');
+  assert.ok(html.includes('Math.min(0.12, py)'), 'syncScene clamps py at 0.12');
+  assert.ok(!html.includes('0.55 * Math.sin'), 'idle sine drift is gone');
+  assert.ok(html.includes('state.pointer.tx *= 0.97'), 'idle eases tx back to 0');
+  assert.ok(html.includes('state.pointer.ty *= 0.97'), 'idle eases ty back to 0');
 });

@@ -116,18 +116,18 @@ test('smoke: pure-sim frame budget (60 sim-seconds must run fast)', () => {
   assert.ok(ms < 3000, `3600 fixed steps took ${ms.toFixed(0)}ms (budget 3000ms)`);
 });
 
-test('structure: every scene manifest asset exists on disk (all 7 scenes)', () => {
+test('structure: every scene manifest asset exists on disk (all 9 scenes)', () => {
   // Phase 2: paths are manifest-driven, so index.html no longer lists
   // them literally. What is pinned instead: every file every manifest
-  // names exists, the registry lists all 7 scenes, and the app builds
+  // names exists, the registry lists all 9 scenes, and the app builds
   // texture URLs from the manifest it fetched.
   const scenes = L.SCENES;
-  assert.equal(scenes.length, 7, 'registry has 7 scenes');
+  assert.equal(scenes.length, 9, 'registry has 9 scenes');
   // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
   // Array prototype differs from this file's, so deepStrictEqual fails
   // on identical contents.)
   assert.equal(scenes.map((s) => s.id).join(','),
-    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku');
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku,himeji-cafe,gero-onsen');
   for (const def of scenes) {
     const m = JSON.parse(readFileSync(path.join(root, def.dir, 'manifest.json'), 'utf8'));
     const check = L.validateManifest(m);

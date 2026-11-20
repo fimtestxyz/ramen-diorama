@@ -1460,3 +1460,74 @@ anchor moved (all edits are luminance-only, no object moved).
   Hakodate Phase 2 files in one batch (text via App, PNGs via browser
   upload); the live E2E must re-check all five strips at rest after
   the push.
+
+## Two new scenes + seam fix (2026-11-21 00:31–00:47)
+
+User request 00:31: create Himeji cafe and Gero onsen scenes. Built by a
+coordinator agent (one worker per scene), verified by me: JS tests,
+rest composites, and I viewed both arts myself.
+
+### himeji-cafe — 姬路咖啡館 / Himeji Cafe / 姫路カフェ (🏯)
+
+Warm kissaten interior: 3 steaming cups on a polished counter, 7 hanging
+lamps, shelves of cups/jars, big window with the white Himeji Castle on a
+green hill at dusk. Steam yes (cups); lanterns [] (layer3 carries the
+shelves too — swinging the plate would swing the shelves; lamps
+flicker/spark as signs instead, 7 emissive rects). No person, no text.
+drips null (interior), snow false, rig null, cloth null.
+Rest composite mean 0.002, p99 0.00, max 4.4; coverages sum 1.0000.
+Emoji was ☕ as specified, changed to 🏯 by me — osaka-cafe already uses
+☕ and the castle is this scene's identity.
+
+### gero-onsen — 下呂溫泉 / Gero Onsen / 下呂温泉 (♨️)
+
+Rotenburo at dusk: steaming milky bath, 2 glowing stone lanterns, red
+maple + pine, wooden fence, river + mountains. Steam yes (strong);
+lanterns [] (stone, don't swing; 2 emissive rects). No people/bathers,
+no text. drips null (no awning), snow false, rig null, cloth null.
+Rest composite mean 0.004, p99 0.05, max 6.3; coverages sum 1.0000.
+One config change after slicing: mask-steam blur 8→4 (tall thin steam
+column + wide flat plume gave intermediate-value fraction 0.068, failing
+the "mostly binary < 0.05" check; blur 4 brings it to 0.034, coverage
+0.124, rest composite unchanged; mask-steam is inspector-only).
+
+Both scenes: 15 files each (source-art, depth, manifest, 5 layers,
+7 masks); fragment model 19.2M vs 47.9M (40%) high/mid, 11.5M (24%) low.
+
+### Seam fix (E2E #8 follow-up, user chose amplitude cap 0.12 at 00:41)
+
+Diagnosis (`analysis/seam-diagnosis/README.md`, pure analysis, no repo
+changes): the band is a parallax gap at layer boundaries showing the
+backdrop's inpaint fill; band width ≈ relative displacement (layer2↔0
+203·px, layer4↔0 289·px); rest composites pixel-perfect (0.01–0.10,
+zero bad pixels). E2E #8's "at rest" was never still — idle drift rocked
+the pointer (tx amplitude 0.55, px up to ±0.44). Bleed tested and
+ineffective (alpha 12→36 only shifts the band +24 px — do NOT re-slice
+for this). Fix, index.html only, zero re-slice:
+- Idle return-to-centre: after 4 s idle, `state.pointer.tx/ty *= 0.97`
+  per frame instead of the sine drift; the picture returns to
+  pixel-perfect a few seconds after the user stops moving the pointer.
+- Amplitude clamp in `syncScene`: |px|,|py| ≤ 0.12 (worst band ≈38 px);
+  sits on px/py after slider + pScale, so sliders/presets need no change.
+- Lint test added (`test/logic.test.mjs`): asserts the clamp lines and
+  the idle decay exist and the sine drift is gone. JS is now 66/66.
+- Also fixed a wrong comment found by the diagnosis: the inpaint hole
+  dilation is a (15,15) kernel = 7 px radius, not 15 px (`slice.py`,
+  `slice_scene.py`).
+
+### Files changed (local only, nothing pushed or uploaded yet)
+
+- `index.html` (2 registry entries + 2 picker options, seam fix,
+  himeji emoji, build stamp 2026-11-21 00:47), `scripts/scenes.json`
+  (8 scenes), `test/logic.test.mjs` (registry 9 scenes + seam lint),
+  `test/smoke.mjs` (9 scenes), `test/scenes.test.py` (8 scenes),
+  `scripts/slice.py` + `scripts/slice_scene.py` (comment only),
+  this spec record, `analysis/seam-diagnosis/` (report + figures +
+  scripts, analysis-only).
+- Per new scene (×2): 14 PNGs (source-art, depth, 5 layers, 7 masks)
+  = 28 PNGs to upload via browser; text files via App push.
+- Live E2E still to check: both scenes render (castle through the
+  window, steaming bath), steam positions, lamp/lantern tap-spark,
+  rain on himeji window / gero river band, no freeze on interior
+  himeji; seam fix — idle a few seconds, the picture goes pixel-perfect
+  (no band at rest); at full pointer deflection the worst band ≈38 px.

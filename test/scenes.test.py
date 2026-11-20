@@ -218,7 +218,7 @@ def test_scene(slug, cfg):
 def main():
     with open(os.path.join(ROOT, "scripts", "scenes.json")) as f:
         cfg = json.load(f)["scenes"]
-    check("5 scenes configured", len(cfg) == 5, f"got {len(cfg)}")
+    check("8 scenes configured", len(cfg) == 8, f"got {len(cfg)}")
     for slug in sorted(cfg):
         test_scene(slug, cfg[slug])
     if failures:

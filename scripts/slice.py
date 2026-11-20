@@ -317,9 +317,9 @@ def main():
     for name in ("layer1", "layer2", "layer3", "layer4"):
         holes |= layer_masks[name]
     holes_d = cv2.dilate(holes, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
-    # 15 px, not 9: the layer alpha is dilated 12 px (see soft()), so
-    # the backdrop must be inpainted at least that far out, or the
-    # foreground ghost would show during parallax.
+    # 7 px radius (15x15 kernel), not 15 px: the layer alpha is dilated
+    # 12 px (see soft()), so the backdrop must be inpainted at least that
+    # far out, or the foreground ghost would show during parallax.
     print(f"foreground coverage: {(holes > 0).mean():.3f} of frame")
     backdrop = inpaint_backdrop(src, holes_d)
 

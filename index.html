@@ -188,7 +188,7 @@
 
 <div id="title" class="hud glass">
   <h1 id="scene-title">深夜ラーメン <span>· 2.5D</span></h1>
-  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-21 00:02</span></p>
+  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-21 00:47</span></p>
 </div>
 
 <div id="topbtns" class="hud">
@@ -200,6 +200,8 @@
     <option value="tokyo-shotengai">🏮 東京下町商店街</option>
     <option value="kyoto-yasaka">🗼 京都八坂塔</option>
     <option value="hakodate-goryokaku">❄️ 函館五稜郭雪夜</option>
+    <option value="himeji-cafe">🏯 姬路咖啡館</option>
+    <option value="gero-onsen">♨️ 下呂溫泉</option>
   </select>
   <select class="btn" id="sel-lang" data-i18n-title="app.langTitle" title="語言">
     <option value="zh" selected>中文</option>
@@ -438,6 +440,38 @@
       street: { x0: 0, y0: 760, x1: 1920, y1: 1080 },
       drips: null,
       snow: true },
+    { id: 'himeji-cafe', name: '姬路咖啡館', title: '姬路咖啡館', dir: 'assets/scenes/himeji-cafe',
+      emoji: '🏯', names: { zh: '姬路咖啡館', en: 'Himeji Cafe', ja: '姫路カフェ' },
+      taxi: false,
+      rig: null,
+      cloth: null,
+      lanterns: [],
+      /* Signs: the seven hanging lamps, measured from the emissive-mask
+         blobs (flood-filled bboxes, padded ~15 px, area order). Lamp
+         bodies sit at the blob centres by construction. No swing group:
+         layer3 also carries the shelves, so swinging the plate would
+         swing the shelves too — the lamps flicker/spark as signs. */
+      signs: [[45, 0, 346, 166], [1067, 0, 1254, 199], [1272, 89, 1439, 272],
+              [1732, 138, 1899, 313], [1495, 156, 1646, 335], [662, 135, 809, 286],
+              [882, 217, 989, 344]],
+      steam: { src: [945, 805], top: [945, 600], width: 0.10, z: 0.34, mist: [0.49, 0.72] },
+      street: { x0: 990, y0: 620, x1: 1920, y1: 690 },
+      drips: null,
+      snow: false },
+    { id: 'gero-onsen', name: '下呂溫泉', title: '下呂溫泉', dir: 'assets/scenes/gero-onsen',
+      emoji: '♨️', names: { zh: '下呂溫泉', en: 'Gero Onsen', ja: '下呂温泉' },
+      taxi: false,
+      rig: null,
+      cloth: null,
+      lanterns: [],
+      /* Signs: the two glowing stone lanterns, measured from the
+         emissive-mask blobs (flood-filled bboxes, padded ~15 px).
+         Stone lanterns do not swing. */
+      signs: [[170, 480, 341, 631], [1555, 580, 1706, 721]],
+      steam: { src: [500, 800], top: [500, 340], width: 0.16, z: 0.34, mist: [0.47, 0.75] },
+      street: { x0: 0, y0: 700, x1: 1920, y1: 1080 },
+      drips: null,
+      snow: false },
   ];
   function sceneById(id) {
     for (var i = 0; i < SCENES.length; i++) if (SCENES[i].id === id) return SCENES[i];
@@ -1365,7 +1399,7 @@ const state = {
   inspMode: 'final',
   audioOn: false,
   radioOn: false,
-  drift: true,           // cinematic drift when the pointer is idle
+  drift: true,           // idle return-to-centre when the pointer is idle (was cinematic drift; seam fix 2026-11-21)
   pointer: { x: 0, y: 0, tx: 0, ty: 0, lastMove: 0 },
   brush: { x: 0, y: 0, active: false },
   fps: 0,
@@ -3255,7 +3289,14 @@ function syncScene() {
   // cannot cover full deflection, so the shift is scaled down just
   // enough that no plate ever leaves the frame uncovered.
   const pScale = L.parallaxScaleFor(camera.aspect);
-  const px = state.pointer.x * p.parallax * pScale, py = -state.pointer.y * p.parallax * pScale;
+  let px = state.pointer.x * p.parallax * pScale, py = -state.pointer.y * p.parallax * pScale;
+  // Seam fix (2026-11-21): clamp parallax amplitude — a layer-boundary gap
+  // opens ~203·px wide (layer2↔backdrop), so |px| > 0.12 leaves a visible
+  // blurred band; 0.12 keeps the worst band ≈38 px (layer4↔backdrop).
+  // The clamp sits on px/py (after slider + pScale), so sliders, presets
+  // and pScale need no changes. See analysis/seam-diagnosis/README.md.
+  px = Math.max(-0.12, Math.min(0.12, px));
+  py = Math.max(-0.12, Math.min(0.12, py));
   // Parallax: plates shift by depth; camera stays fixed.
   for (const [id, mesh] of Object.entries(plates)) {
     // Lantern plates live inside swing groups with a pivot offset in
@@ -3446,12 +3487,17 @@ function loop(now) {
   const rawDt = (lastT > 0 && now > lastT) ? (now - lastT) / 1000 : 0.016;
   const dtWall = Math.min(0.25, rawDt);
   lastT = now;
-  // Cinematic drift when the pointer is idle.
+  // Idle return-to-centre (seam fix, 2026-11-21): the old cinematic drift
+  // kept rocking the pointer (tx amplitude 0.55, px up to ±0.44), so the
+  // parallax seam band never settled — the tester never saw a true still
+  // frame. After 4 s idle, ease the target back to (0,0) instead; a few
+  // seconds later the picture is pixel-perfect (rest composites measure
+  // 0.01–0.10 mean abs diff, zero bad pixels). See
+  // analysis/seam-diagnosis/README.md.
   const idleFor = now - state.pointer.lastMove;
   if (idleFor > 4000 && state.drift) {
-    const t = now / 1000;
-    state.pointer.tx = 0.55 * Math.sin(t * 0.11);
-    state.pointer.ty = 0.35 * Math.sin(t * 0.073 + 2.0);
+    state.pointer.tx *= 0.97;
+    state.pointer.ty *= 0.97;
   }
   state.pointer.x += (state.pointer.tx - state.pointer.x) * 0.04;
   state.pointer.y += (state.pointer.ty - state.pointer.y) * 0.04;
