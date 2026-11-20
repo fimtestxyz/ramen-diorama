@@ -44,7 +44,7 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   The app never re-slices at runtime.
 - Depth plates (z): −0.36 backdrop, −0.05 rear lantern, +0.15 noren,
   +0.20 front lantern, +0.34 woman + counter. Camera distance 5.0,
-  parallax overscan 1.036, shift ±0.26 / ±0.14. World plane recomputed
+  parallax overscan 1.18, shift ±0.26 / ±0.14. World plane recomputed
   from the actual 16:9 aspect (height 2.000 → width 3.5556).
 - Reference (verification discipline only, not the pipeline):
   `sloemo01/diorama` (MIT) — deterministic frames, per-entity frame QA.
@@ -61,6 +61,43 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   Jump Board. Do not repeat this.)
 - Test the real call shape. (Stickerify headphone lesson: a fix that
   sorts the wrong object shape is a no-op.)
+
+## Build lessons (2026-11-20, found by the headless tests)
+
+- UV mapping direction: the visible central 1/OVERSCAN of a plate must
+  map to texture [0,1], i.e. texture-uv = (geometry-uv − u0)/(u1 − u0).
+  The inverse (remapping INTO the inset window) crops ~14% per side at
+  rest and looks like a zoomed-in scene. The head-pivot/eye local coords
+  use the inverse mapping (geometry-uv = u0 + (u1−u0)·frame-fraction)
+  and were correct — do not "fix" them the same way.
+- A splash condition must be reachable: `stepRain`'s exit test and
+  splash test were mutually exclusive, so rain produced zero splashes
+  for the whole build until a test counted them. Count the effects, not
+  just the code path.
+- `validateManifest` must match the manifest's real shape (layers is an
+  object keyed by id, not an array). The wrong check would have thrown
+  on every page load. The real manifest is the test fixture.
+- One water heightfield, one owner: the sim owns `sim.water`; the render
+  loop only uploads it. A second copy drifts. Tap splashes go through a
+  queue consumed by the next frame's water step, never written directly
+  into a uniform the next frame overwrites.
+- The post pass must encode to sRGB: built-in materials skip the sRGB
+  encode when rendering to a render target, so the final shader does it.
+- `waterImpulse` iterates only the impulse disc's bounding box (same
+  result as the full-grid scan, ~40× less work). The PDE height is
+  clamped to ±2 in both the CPU step and the GPU shader (saturating
+  puddle) so rain bursts cannot spike the reflection distortion.
+- Lantern pivots come from `manifest.anchors.lantern_front_pivot` /
+  `lantern_rear_pivot` (hardcoded fallback = same numbers). The manifest
+  also carries `noren_rod`, `awning_drips`, `steam_top`, `bowl_rx_ry`,
+  `counter_top_y` — the logic block hardcodes its own copies (drips
+  x 0.05–0.33 ≈ awning 100–600 px) because it is pure and manifest-free.
+- Depth (offline): Node inference failed (onnxruntime-node postinstall +
+  NuGet ECONNRESET); Python onnxruntime 1.32.0 with the identical V2
+  Small weights works. The ONNX output is [batch, H, W] (no channel
+  dim) — indexing it as [batch, 1, H, W] produces a garbage map.
+- three.js CDN: `browser.open` of the jsDelivr URL failed; the pin was
+  verified via the npm registry instead. Do not re-attempt that fetch.
 
 ## Push rules (repo-wide, learned 2026-11-18)
 

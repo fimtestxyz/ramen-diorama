@@ -62,10 +62,13 @@
 - Deterministic fixed-step simulation, 1/60 s. (Original seed 19890417;
   ours: 20261120.)
 
-## Scene & depth scale (from the original, to match)
+## Scene & depth scale (from the original, adapted to our 16:9 art)
 
-- World artwork plane 3.5833 × 2.000, camera distance 5.0, 1.036 parallax
-  overscan, ±0.26 horizontal / ±0.14 vertical shift.
+- World artwork plane 3.5556 × 2.000, camera distance 5.0, 1.18 parallax
+  overscan, ±0.26 horizontal / ±0.14 vertical shift. (The original's
+  3.5833 width and 1.036 overscan were for its 1376×768 art; ours is
+  1920×1080 16:9, so the plane is 2.000 × 16/9 = 3.5556 and the overscan
+  is 1.18 — consistent with the 1.0×–1.18× zoom clamp below.)
 - Five perspective-locked depth plates, scaled by exact (d − z) / d so the
   hero rest registers pixel-for-pixel with the original artwork:
   - z = −0.36 inpainted wet neon alley backdrop
@@ -180,3 +183,57 @@
 - **Scope.** This is a large single build. If live E2E exposes a
   systematic failure (as Jr. round 1 did), diagnose frame-by-frame and
   fix in rounds — do not defend a passing headless test.
+
+## Build record (2026-11-20, one full pass)
+
+- Depth: the Node route failed — `npm install @huggingface/transformers`
+  broke twice (onnxruntime-node postinstall "Invalid package config",
+  then ECONNRESET to api.nuget.org). Offline depth was generated with
+  Python onnxruntime 1.32.0 using the IDENTICAL model weights
+  (`onnx-community/depth-anything-v2-small`, `onnx/model_quantized.onnx`,
+  27,258,801 bytes). The in-browser app still uses
+  `@huggingface/transformers` as specified; only the offline generation
+  runtime differs. `scripts/depth.py` documents this.
+- three.js CDN: `browser.open` of the jsDelivr URL failed with "Page not
+  found" (do not re-attempt that fetch); verified instead via the npm
+  registry (`npm view three version` → 0.187.0 is latest and exists).
+  The app pins `three@0.187.0` in the importmap with a load-failure
+  toast fallback.
+- Depth map note: the ONNX output has no channel dim ([batch, H, W]) —
+  the first run indexed it as [batch, 1, H, W] and produced a garbage
+  1-D row stretched into a fake map. Fixed, re-ran, verified real.
+- Bugs found by the headless tests during the build (all fixed, all
+  covered by tests in `test/`):
+  1. UV mapping was inverted: the geometry UVs were remapped INTO the
+     inset window, which crops the image ~14% per side at rest. Correct
+     mapping is texture-uv = (geometry-uv − u0)/(u1 − u0), so the
+     visible central 1/OVERSCAN of each plate shows exactly the full
+     artwork. Fixed in `plateGeometry`, the woman plate, the noren
+     strips, and the street shader. (The head-pivot/eye local coords
+     were already right — they use the inverse mapping.)
+  2. `stepRain` never splashed: the exit test (`d.y > 1.02`) and the
+     splash test (`d.y < 1.02`) were mutually exclusive, so rain
+     produced zero splashes. Drops now carry a `land` y inside the
+     street band and splash when they reach it.
+  3. `validateManifest` expected `layers` to be an array; the manifest
+     has an object keyed by id. The app would have thrown "manifest
+     invalid" on every load. Fixed to check 5 object entries + strictly
+     increasing z.
+  4. Water height could spike to ~5 under heavy rain (reflection
+     distortion). The PDE is now saturating: height clamped to ±2 in
+     both the CPU `waterStep` and the GPU update shader.
+  5. The CPU water path had a second heightfield that drifted from the
+     sim's; the render loop now uploads the sim's own `sim.water`
+     (32×32) as the CPU texture. Tap splashes go through a
+     `pendingImpulses` queue (the old code wrote directly into the GPU
+     uniform slot, which the next frame overwrote before use).
+  6. The post pass rendered linear values to the screen without an
+     sRGB encode (the image would have looked dark). `POST_FRAG` now
+     encodes to sRGB on the way out.
+- Performance: `waterImpulse` now iterates only the impulse disc's
+  bounding box instead of the whole grid (same result, ~40× less work).
+- CI (`.github/workflows/ci.yml`) runs `node --check` on scripts/tests,
+  `node --test test/*.test.mjs`, the Python slice tests, and the
+  source-art existence check. Note: `node --check` on the inline
+  `index.html` script blocks is covered by `test/smoke.mjs`, which
+  extracts and checks them.

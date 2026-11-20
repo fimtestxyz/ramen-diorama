@@ -1,0 +1,2221 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>深夜拉麵 · 2.5D Diorama</title>
+<meta name="description" content="One anime illustration, turned into a living 60 fps 2.5D diorama. No AI video, no audio files, everything on-device.">
+<style>
+  :root {
+    --glass: rgba(12, 14, 22, 0.58);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --text: #f2ede4;
+    --muted: #b9b2a4;
+    --accent: #ff5a3c;
+    --neon: #7dd3fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #07080d; }
+  body { font-family: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; color: var(--text); }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .hidden { display: none !important; }
+
+  /* ---------- HUD ---------- */
+  .hud { position: fixed; z-index: 10; user-select: none; }
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+  #title { top: 14px; left: 14px; padding: 10px 14px; }
+  #title h1 { font-size: 17px; letter-spacing: 0.12em; font-weight: 700; }
+  #title h1 span { color: var(--accent); }
+  #title p { font-size: 11px; color: var(--muted); margin-top: 2px; letter-spacing: 0.04em; }
+  #topbtns { top: 14px; right: 14px; display: flex; gap: 8px; }
+  .btn {
+    font: inherit; font-size: 13px; color: var(--text);
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 10px; padding: 8px 12px; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .btn:hover { border-color: rgba(255, 255, 255, 0.4); }
+  .btn.active { background: rgba(255, 90, 60, 0.25); border-color: var(--accent); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ---------- Mood presets ---------- */
+  #presets { left: 14px; bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; max-width: 60vw; }
+  #presets .btn { padding: 9px 14px; }
+  #presets .btn.active { background: rgba(125, 211, 252, 0.22); border-color: var(--neon); }
+
+  /* ---------- Control panel ---------- */
+  #panel {
+    right: 14px; bottom: 14px; width: 248px; padding: 14px;
+    font-size: 12px;
+  }
+  #panel h2 { font-size: 12px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+  #panel label { display: flex; justify-content: space-between; margin: 8px 0 2px; color: var(--text); }
+  #panel label output { color: var(--neon); font-variant-numeric: tabular-nums; }
+  #panel input[type="range"] { width: 100%; accent-color: var(--accent); }
+  #panel .row { display: flex; gap: 8px; margin-top: 12px; }
+  #panel .row .btn { flex: 1; text-align: center; }
+
+  /* ---------- Inspector ---------- */
+  #inspector {
+    left: 50%; top: 14px; transform: translateX(-50%);
+    padding: 10px 12px; font-size: 12px; max-width: min(92vw, 560px);
+  }
+  #inspector .modes { display: flex; gap: 6px; flex-wrap: wrap; }
+  #inspector .modes .btn { padding: 6px 9px; font-size: 12px; }
+  #inspector .layers { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  #inspector .layers label {
+    display: flex; align-items: center; gap: 4px; cursor: pointer;
+    border: 1px solid var(--glass-border); border-radius: 8px; padding: 4px 8px;
+  }
+  #inspector .layers label.off { opacity: 0.45; }
+  #inspector .depthrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  #inspector .depthrow span { color: var(--muted); }
+  #depthview { margin-top: 8px; max-width: 100%; border-radius: 8px; }
+
+  /* ---------- Compare curtain ---------- */
+  #curtain {
+    position: fixed; top: 0; bottom: 0; width: 2px; z-index: 9;
+    background: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.8);
+    cursor: ew-resize; display: none;
+  }
+  #curtain::after {
+    content: "◂ 原圖 · LIVE ▸";
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 8px; padding: 5px 9px; font-size: 11px; white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+  #curtain.on { display: block; }
+
+  /* ---------- Toast / loading ---------- */
+  #toast {
+    left: 50%; bottom: 84px; transform: translateX(-50%);
+    padding: 9px 16px; font-size: 13px; z-index: 20; max-width: 92vw;
+    text-align: center; pointer-events: none;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 30; display: flex;
+    align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+    background: #07080d;
+  }
+  #loading .bar { width: 220px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
+  #loading .bar i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+  #loading p { color: var(--muted); font-size: 13px; letter-spacing: 0.08em; }
+
+  /* ---------- No-WebGL fallback: CSS parallax ---------- */
+  #fallback { position: fixed; inset: 0; overflow: hidden; background: #07080d; }
+  #fallback .fl { position: absolute; inset: -4%; width: 108%; height: 108%; object-fit: cover; will-change: transform; }
+  #fallback .note {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    padding: 8px 14px; font-size: 12px; color: var(--muted); white-space: nowrap;
+  }
+
+  kbd {
+    font: 11px ui-monospace, monospace; background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 1px 5px;
+  }
+  #keys { position: fixed; left: 14px; bottom: 64px; z-index: 10; font-size: 11px; color: var(--muted); }
+  #keys span { margin-right: 10px; }
+
+  @media (max-width: 760px) {
+    #title { padding: 8px 10px; }
+    #title h1 { font-size: 14px; }
+    #title p { display: none; }
+    #panel {
+      left: 0; right: 0; bottom: 0; width: auto; border-radius: 16px 16px 0 0;
+      max-height: 46vh; overflow-y: auto;
+    }
+    #presets { bottom: auto; top: 64px; left: 10px; max-width: 94vw; }
+    #keys { display: none; }
+    #inspector { top: 108px; }
+    #toast { bottom: auto; top: 160px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="fallback" class="hidden">
+  <img class="fl" data-z="-0.36" src="assets/layers/layer0-backdrop.png" alt="">
+  <img class="fl" data-z="-0.05" src="assets/layers/layer1-rear-lantern.png" alt="">
+  <img class="fl" data-z="0.15" src="assets/layers/layer2-noren.png" alt="">
+  <img class="fl" data-z="0.20" src="assets/layers/layer3-front-lantern.png" alt="">
+  <img class="fl" data-z="0.34" src="assets/layers/layer4-woman-counter.png" alt="">
+  <div class="note glass">WebGL 不可用 — 以 CSS 視差顯示（移動滑鼠試試）</div>
+</div>
+
+<div id="loading">
+  <div class="bar"><i id="loadbar"></i></div>
+  <p id="loadmsg">正在載入圖層…</p>
+</div>
+
+<div id="title" class="hud glass">
+  <h1>深夜ラーメン <span>· 2.5D</span></h1>
+  <p>一張圖 · 全部在你的裝置上算出來 · <span id="fps">— fps</span></p>
+</div>
+
+<div id="topbtns" class="hud">
+  <button class="btn" id="btn-audio" title="音效 (M)">🔇 音效</button>
+  <button class="btn" id="btn-compare" title="對比原圖 (C)">◐ 對比</button>
+  <button class="btn" id="btn-inspector" title="圖層檢查器 (D)">▦ 檢查</button>
+  <button class="btn" id="btn-hide" title="隱藏介面 (H)">隱藏</button>
+</div>
+
+<div id="presets" class="hud">
+  <button class="btn" data-mood="drizzle">🌧 毛毛雨</button>
+  <button class="btn" data-mood="typhoon">🌀 颱風</button>
+  <button class="btn" data-mood="3am">🌙 凌晨三點</button>
+  <button class="btn" data-mood="steam">♨ 蒸汽</button>
+</div>
+
+<div id="panel" class="hud glass">
+  <h2>氣氛 ATMO&shy;SPHERE</h2>
+  <label>雨勢 Rain <output id="o-rain">0.45</output></label>
+  <input type="range" id="s-rain" min="0" max="1" step="0.01" value="0.45">
+  <label>風 Wind <output id="o-wind">0.35</output></label>
+  <input type="range" id="s-wind" min="0" max="1" step="0.01" value="0.35">
+  <label>霓虹閃爍 Neon <output id="o-flicker">0.5</output></label>
+  <input type="range" id="s-flicker" min="0" max="1" step="0.01" value="0.5">
+  <label>蒸汽 Steam <output id="o-steam">0.5</output></label>
+  <input type="range" id="s-steam" min="0" max="1" step="0.01" value="0.5">
+  <label>視差深度 Parallax <output id="o-parallax">0.8</output></label>
+  <input type="range" id="s-parallax" min="0" max="1" step="0.01" value="0.8">
+  <div class="row">
+    <button class="btn" id="btn-lightning">⚡ 打雷</button>
+    <button class="btn" id="btn-radio">📻 Lo-Fi</button>
+    <button class="btn" id="btn-reset">↺ 重設</button>
+  </div>
+</div>
+
+<div id="inspector" class="hud glass hidden">
+  <div class="modes" id="insp-modes">
+    <button class="btn active" data-mode="final">Final</button>
+    <button class="btn" data-mode="no-post">No-Post</button>
+    <button class="btn" data-mode="depth">Depth</button>
+    <button class="btn" data-mode="masks">Masks</button>
+    <button class="btn" data-mode="emissive">Emissive</button>
+    <button class="btn" data-mode="original">Original</button>
+  </div>
+  <div class="layers" id="insp-layers"></div>
+  <div class="depthrow">
+    <button class="btn" id="btn-depth-live">▶ 重新估深度（裝置內執行）</button>
+    <span id="depth-status">已載入離線深度圖</span>
+  </div>
+  <img id="depthview" class="hidden" alt="depth map">
+</div>
+
+<div id="curtain"></div>
+<div id="toast" class="hud glass hidden"></div>
+<div id="keys" class="hud"><span><kbd>C</kbd> 對比</span><span><kbd>H</kbd> 隱藏</span><span><kbd>Space</kbd> 暫停</span><span><kbd>M</kbd> 音效</span><span><kbd>D</kbd> 檢查</span></div>
+
+<script id="ramen-logic">
+/* RamenLogic — pure, testable simulation math for the ramen diorama.
+   No DOM, no THREE, no Audio. The app wires this to the renderer.
+   Deterministic: same seed + same number of fixed steps => same state,
+   regardless of how wall-clock time was grouped into frames. */
+(function () {
+  'use strict';
+  var SEED = 20261120;
+  var DT = 1 / 60;
+  var CAM_D = 5.0;
+  var PLANE_W = 3.5556, PLANE_H = 2.0;
+  var OVERSCAN = 1.18;
+  var MAX_CAM_X = 0.26, MAX_CAM_Y = 0.14;
+  var PLATE_KX = 0.26 / 0.34, PLATE_KY = 0.14 / 0.34;
+  var LAYERS = [
+    { id: 'layer0', file: 'layers/layer0-backdrop.png', z: -0.36 },
+    { id: 'layer1', file: 'layers/layer1-rear-lantern.png', z: -0.05 },
+    { id: 'layer2', file: 'layers/layer2-noren.png', z: 0.15 },
+    { id: 'layer3', file: 'layers/layer3-front-lantern.png', z: 0.20 },
+    { id: 'layer4', file: 'layers/layer4-woman-counter.png', z: 0.34 }
+  ];
+  var MOODS = {
+    drizzle: { rain: 0.45, wind: 0.35, flicker: 0.5, steam: 0.5, parallax: 0.8, lightning: 0 },
+    typhoon: { rain: 1.0, wind: 1.0, flicker: 0.9, steam: 0.3, parallax: 1.0, lightning: 1 },
+    '3am':   { rain: 0.25, wind: 0.15, flicker: 0.35, steam: 0.7, parallax: 0.6, lightning: 0 },
+    steam:   { rain: 0.15, wind: 0.1, flicker: 0.4, steam: 1.0, parallax: 0.7, lightning: 0 }
+  };
+  var MAX_STEPS_PER_FRAME = 5;
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  /* ---- plate geometry ---- */
+  function plateScale(z) { return (CAM_D - z) / CAM_D; }
+  /* Extra plate offset beyond the camera move: near plates travel further.
+     px, py in [-1, 1]. Sign: plates move opposite the pointer (camera-move
+     convention); z < 0 plates move the other way. */
+  function plateShift(z, px, py) {
+    return { x: -px * z * PLATE_KX, y: -py * z * PLATE_KY };
+  }
+  /* UV inset for the overscan: at rest the camera sees the central
+     1/OVERSCAN of the plane, which must show exactly the full artwork. */
+  function uvInset() {
+    var h = 0.5 / OVERSCAN;
+    return { u0: 0.5 - h, u1: 0.5 + h };
+  }
+  /* Does the backdrop plane still cover the whole frame at this parallax?
+     Apparent half-width of the backdrop plane is PLANE_W/2 * OVERSCAN
+     (perspective cancels the (d-z)/d scale); its apparent shift is
+     shift * d/(d-z). */
+  function coversFrame(z, px, py) {
+    var halfW = (PLANE_W / 2) * OVERSCAN;
+    var halfH = (PLANE_H / 2) * OVERSCAN;
+    var s = plateShift(z, px, py);
+    var appX = Math.abs(s.x) * CAM_D / (CAM_D - z);
+    var appY = Math.abs(s.y) * CAM_D / (CAM_D - z);
+    return (halfW - appX) >= PLANE_W / 2 && (halfH - appY) >= PLANE_H / 2;
+  }
+
+  /* ---- shallow-water PDE (CPU mirror of the GPU shader rule) ---- */
+  function waterStep(h, v, n, damp) {
+    // h, v: Float32Array(n*n). Neumann boundaries: edge samples clamp.
+    var next = new Float32Array(n * n);
+    for (var y = 0; y < n; y++) {
+      for (var x = 0; x < n; x++) {
+        var i = y * n + x;
+        var xl = x > 0 ? i - 1 : i, xr = x < n - 1 ? i + 1 : i;
+        var yu = y > 0 ? i - n : i, yd = y < n - 1 ? i + n : i;
+        var nv = v[i] + (h[xl] + h[xr] + h[yu] + h[yd] - 4 * h[i]) * 0.28;
+        nv *= damp;
+        // Saturating puddle: cap the height so a burst of simultaneous
+        // splashes cannot spike the reflection distortion.
+        next[i] = clamp(h[i] + nv, -2, 2);
+        v[i] = nv;
+      }
+    }
+    h.set(next);
+    var max = 0;
+    for (var k = 0; k < n * n; k++) { var a = Math.abs(h[k]); if (a > max) max = a; }
+    return max;
+  }
+  function waterImpulse(h, n, fx, fy, amp, radius) {
+    var cx = fx * (n - 1), cy = fy * (n - 1);
+    var r = Math.max(1, radius * n);
+    // Only the cells inside the impulse disc can change: iterate its box.
+    var x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(n - 1, Math.ceil(cx + r));
+    var y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(n - 1, Math.ceil(cy + r));
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        var dx = x - cx, dy = y - cy;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < r * r) h[y * n + x] += amp * Math.exp(-d2 / (r * r * 0.5));
+      }
+    }
+  }
+
+  /* ---- blink: 3-stage (closing 0.12s, closed 0.06s, opening 0.18s) ---- */
+  function blinkAmountAt(mode, t) {
+    if (mode === 'open') return 0;
+    if (mode === 'closing') return clamp(t / 0.12, 0, 1);
+    if (mode === 'closed') return 1;
+    if (mode === 'opening') return 1 - clamp(t / 0.18, 0, 1);
+    return 0;
+  }
+
+  /* ---- rain ---- */
+  function makeRain(count, rng) {
+    var drops = [];
+    for (var i = 0; i < count; i++) {
+      drops.push({
+        x: rng(), y: rng(),
+        speed: 0.55 + rng() * 0.45,          // UV units per second
+        slant: (7 + rng() * 8) * Math.PI / 180, // 7-15 degrees
+        len: 0.012 + rng() * 0.01,
+        land: 0.65 + rng() * 0.35             // landing y inside the street band
+      });
+    }
+    return drops;
+  }
+  /* Returns splash events {x, y, amp} for drops that hit the street band
+     (street occupies UV y 0.65..1.0, x 0..0.36 in the frame).
+     Each drop has a landing y inside the band: it splashes when it reaches
+     it, provided it is still over the band in x. Coordinates are
+     normalised to the water heightfield (x: /0.36, y: (land-0.65)/0.35). */
+  function stepRain(drops, active, dt, wind, rng) {
+    var splashes = [];
+    for (var i = 0; i < drops.length; i++) {
+      var d = drops[i];
+      if (i >= active) { continue; }
+      d.y += d.speed * dt;
+      d.x += (Math.tan(d.slant) * d.speed + wind * 0.06) * dt;
+      if (d.y >= d.land) {
+        if (d.x > 0.02 && d.x < 0.36) {
+          // Heightfield coords: x spans the street band (0..0.36), y the band (0.65..1.0).
+          splashes.push({ x: d.x / 0.36, y: (d.land - 0.65) / 0.35, amp: 0.5 + rng() * 0.5 });
+        }
+        d.y = -0.02 - rng() * 0.05;
+        d.x = rng() * 0.9;
+        d.speed = 0.55 + rng() * 0.45;
+        d.slant = (7 + rng() * 8) * Math.PI / 180;
+        d.land = 0.65 + rng() * 0.35;
+      } else if (d.x > 1.05) {
+        // Drifted off the right edge before landing: respawn silently.
+        d.y = -0.02 - rng() * 0.05;
+        d.x = rng() * 0.9;
+        d.speed = 0.55 + rng() * 0.45;
+        d.slant = (7 + rng() * 8) * Math.PI / 180;
+        d.land = 0.65 + rng() * 0.35;
+      }
+    }
+    return splashes;
+  }
+
+  function nextEventDelay(rng, kind) {
+    return kind === 'taxi' ? 22 + rng() * 18 : 28 + rng() * 30;
+  }
+
+  /* ---- the deterministic simulation ---- */
+  function createSim(seed) {
+    var rng = mulberry32(seed == null ? SEED : seed);
+    var waterN = 32;
+    return {
+      seed: seed == null ? SEED : seed,
+      rng: rng,
+      t: 0, frame: 0,
+      mood: 'drizzle',
+      params: Object.assign({}, MOODS.drizzle),
+      parallax: { x: 0, y: 0 },
+      breath: 0,
+      blink: { mode: 'open', t: 0, next: 2.0 + rng() * 2.0 },
+      lanterns: [
+        { a: 0.02, v: 0, len: 1.0 },
+        { a: -0.015, v: 0, len: 0.82 }
+      ],
+      noren: [0, 1, 2, 3, 4, 5].map(function () { return { d: 0, v: 0 }; }),
+      water: { n: waterN, h: new Float32Array(waterN * waterN), v: new Float32Array(waterN * waterN), max: 0 },
+      rain: makeRain(600, rng),
+      drips: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(function () {
+        return { x: 0.05 + rng() * 0.28, y: 0.09 + rng() * 0.4, v: 0, wait: rng() * 2 };
+      }),
+      splashes: [],
+      events: {
+        taxiAt: 16 + rng() * 10, lightningAt: 26 + rng() * 20,
+        taxi: 0, lightning: 0, lightningEnv: 0
+      },
+      signs: [0, 1, 2, 3, 4].map(function () { return { flicker: 1, dip: 0, spark: 0 }; }),
+      steamPhase: rng() * 10
+    };
+  }
+
+  function stepSim(sim) {
+    var dt = DT, rng = sim.rng, p = sim.params;
+    sim.t += dt; sim.frame++;
+    var t = sim.t;
+
+    /* breathing: slow asymmetric sine, 0..1 */
+    sim.breath = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI / 4.2);
+
+    /* blink state machine */
+    var b = sim.blink;
+    b.t += dt;
+    if (b.mode === 'open' && b.t >= b.next) { b.mode = 'closing'; b.t = 0; }
+    else if (b.mode === 'closing' && b.t >= 0.12) { b.mode = 'closed'; b.t = 0; }
+    else if (b.mode === 'closed' && b.t >= 0.06) { b.mode = 'opening'; b.t = 0; }
+    else if (b.mode === 'opening' && b.t >= 0.18) {
+      b.mode = 'open'; b.t = 0; b.next = 2.0 + rng() * 3.5;
+    }
+
+    /* lanterns: coupled pendulums, wind-driven */
+    var windGust = p.wind * 0.35 * Math.sin(t * 0.9) + p.wind * 0.15 * Math.sin(t * 2.3 + 1.7);
+    for (var i = 0; i < 2; i++) {
+      var L = sim.lanterns[i], other = sim.lanterns[1 - i];
+      var k = Math.pow(2 * Math.PI / (2.2 * L.len), 2);
+      var acc = -k * L.a - 0.18 * L.v + 0.9 * (other.a - L.a) + windGust * 0.6;
+      L.v += acc * dt;
+      L.a += L.v * dt;
+      L.a = clamp(L.a, -0.16, 0.16);
+    }
+
+    /* noren panels: damped springs toward a travelling wind ripple */
+    for (var j = 0; j < 6; j++) {
+      var P = sim.noren[j];
+      var target = p.wind * 0.10 * Math.sin(2 * Math.PI * (t * 0.7 + j * 0.35));
+      var acc2 = 60 * (target - P.d) - 6 * P.v;
+      P.v += acc2 * dt;
+      P.d += P.v * dt;
+      P.d = clamp(P.d, -0.3, 0.3);
+    }
+
+    /* rain + splashes into the water */
+    var active = Math.floor(600 * p.rain);
+    var spl = stepRain(sim.rain, active, dt, p.wind, rng);
+    sim.splashes = spl.slice(0, 8);
+    for (var s = 0; s < sim.splashes.length; s++) {
+      var sp = sim.splashes[s];
+      waterImpulse(sim.water.h, sim.water.n, sp.x, sp.y, sp.amp * 0.6, 0.05);
+    }
+
+    /* awning drips: gravity, splash on the street */
+    for (var d = 0; d < sim.drips.length; d++) {
+      var dr = sim.drips[d];
+      if (dr.wait > 0) { dr.wait -= dt; continue; }
+      dr.v += 2.2 * dt;
+      dr.y += dr.v * dt;
+      if (dr.y > 0.62) {
+        waterImpulse(sim.water.h, sim.water.n, dr.x / 0.36, 0.95, 0.9, 0.06);
+        sim.splashes.push({ x: dr.x / 0.36, y: 0.95, amp: 0.9 });
+        dr.y = 0.09; dr.v = 0; dr.wait = 0.4 + rng() * 2.4;
+        dr.x = 0.05 + rng() * 0.28;
+      }
+    }
+
+    /* water PDE */
+    sim.water.max = waterStep(sim.water.h, sim.water.v, sim.water.n, 0.985);
+
+    /* narrative events: taxi + lightning, seeded schedule */
+    var ev = sim.events;
+    if (ev.taxi === 0 && t >= ev.taxiAt) ev.taxi = 0.0001;
+    if (ev.taxi > 0) {
+      ev.taxi += dt / 4.0;
+      if (ev.taxi >= 1) { ev.taxi = 0; ev.taxiAt = t + nextEventDelay(rng, 'taxi'); }
+    }
+    if (ev.lightning === 0 && t >= ev.lightningAt) ev.lightning = 0.0001;
+    if (ev.lightning > 0) {
+      ev.lightning += dt / 0.6;
+      if (ev.lightning >= 1) { ev.lightning = 0; ev.lightningAt = t + nextEventDelay(rng, 'lightning'); }
+    }
+    ev.lightningEnv = ev.lightning > 0 ? Math.sin(Math.min(ev.lightning, 1) * Math.PI) : 0;
+
+    /* neon ballast flicker: mostly 1, occasional dip; spark decays */
+    for (var s2 = 0; s2 < 5; s2++) {
+      var S = sim.signs[s2];
+      if (S.dip > 0) {
+        S.dip--;
+        S.flicker = 0.35 + rng() * 0.35;
+      } else {
+        S.flicker = 0.96 + rng() * 0.04;
+        if (rng() < 0.0015 * (0.5 + p.flicker)) S.dip = 2 + Math.floor(rng() * 4);
+      }
+      S.spark *= 0.85;
+      if (S.spark < 0.01) S.spark = 0;
+    }
+
+    sim.steamPhase += dt;
+  }
+
+  /* Fixed-step accumulator with spiral-of-death guard. Returns
+     { steps, discarded } — discarded is simulated time dropped when a
+     wall-clock spike would otherwise queue more than maxSteps steps. */
+  function advance(sim, dtWall, maxSteps) {
+    maxSteps = maxSteps == null ? MAX_STEPS_PER_FRAME : maxSteps;
+    if (!(sim._acc >= 0)) sim._acc = 0;
+    sim._acc += Math.max(0, dtWall);
+    var steps = 0;
+    while (sim._acc >= DT && steps < maxSteps) {
+      stepSim(sim);
+      sim._acc -= DT;
+      steps++;
+    }
+    var discarded = 0;
+    if (sim._acc >= DT) { discarded = sim._acc; sim._acc = 0; }
+    return { steps: steps, discarded: discarded };
+  }
+
+  function applyImpulseLantern(sim, i, dv) {
+    sim.lanterns[i].v += dv;
+  }
+  function applyBrushNoren(sim, panel, impulse) {
+    sim.noren[panel].v += impulse;
+  }
+  function applySpark(sim, sign) {
+    sim.signs[sign].spark = 1;
+    sim.signs[sign].dip = 3;
+  }
+  function blinkAmount(sim) { return blinkAmountAt(sim.blink.mode, sim.blink.t); }
+
+  /* Pure mapping from sim state to audio parameters. All gains 0..1. */
+  function audioParams(sim, parallaxX) {
+    var p = sim.params;
+    return {
+      rainGain: 0.04 + 0.30 * p.rain,
+      dripRate: 0.4 + 1.6 * p.rain,
+      simmerGain: 0.10 + 0.15 * p.steam,
+      buzzGain: 0.015 + 0.03 * p.flicker,
+      trainGain: 0.05,
+      pan: clamp(parallaxX * 0.4, -0.4, 0.4),
+      thunder: sim.events.lightningEnv,
+      taxi: sim.events.taxi
+    };
+  }
+
+  /* Turbo-like ramp for the inspector depth view: blue -> cyan -> green
+     -> yellow -> red. d in [0, 1], larger = nearer. */
+  function depthColor(d) {
+    d = clamp(d, 0, 1);
+    var stops = [
+      [0.0, 48, 18, 156], [0.25, 32, 144, 224], [0.5, 34, 196, 116],
+      [0.75, 248, 220, 60], [1.0, 240, 40, 20]
+    ];
+    for (var i = 0; i < stops.length - 1; i++) {
+      var a = stops[i], b = stops[i + 1];
+      if (d >= a[0] && d <= b[0]) {
+        var f = (d - a[0]) / (b[0] - a[0]);
+        return [
+          Math.round(a[1] + (b[1] - a[1]) * f),
+          Math.round(a[2] + (b[2] - a[2]) * f),
+          Math.round(a[3] + (b[3] - a[3]) * f)
+        ];
+      }
+    }
+    return [240, 40, 20];
+  }
+
+  function validateManifest(m) {
+    var errors = [];
+    if (!m || !m.layers || typeof m.layers !== 'object'
+        || Object.keys(m.layers).length !== 5) {
+      errors.push('manifest.layers must have 5 entries');
+    } else {
+      var zs = Object.keys(m.layers).map(function (k) { return m.layers[k].z; });
+      for (var i = 1; i < zs.length; i++) {
+        if (!(zs[i] > zs[i - 1])) errors.push('layer z not strictly increasing at ' + i);
+      }
+    }
+    if (!m || !m.anchors || !Array.isArray(m.anchors.eyes) || m.anchors.eyes.length !== 2) {
+      errors.push('anchors.eyes must have 2 entries');
+    }
+    if (!m || !m.masks || Object.keys(m.masks).length !== 7) {
+      errors.push('expected 7 masks');
+    }
+    return { ok: errors.length === 0, errors: errors };
+  }
+
+  var RamenLogic = {
+    SEED: SEED, DT: DT, CAM_D: CAM_D, PLANE_W: PLANE_W, PLANE_H: PLANE_H,
+    OVERSCAN: OVERSCAN, MAX_CAM_X: MAX_CAM_X, MAX_CAM_Y: MAX_CAM_Y,
+    LAYERS: LAYERS, MOODS: MOODS, MAX_STEPS_PER_FRAME: MAX_STEPS_PER_FRAME,
+    mulberry32: mulberry32, clamp: clamp,
+    plateScale: plateScale, plateShift: plateShift, uvInset: uvInset,
+    coversFrame: coversFrame,
+    waterStep: waterStep, waterImpulse: waterImpulse,
+    blinkAmountAt: blinkAmountAt, makeRain: makeRain, stepRain: stepRain,
+    nextEventDelay: nextEventDelay,
+    createSim: createSim, stepSim: stepSim, advance: advance,
+    applyImpulseLantern: applyImpulseLantern, applyBrushNoren: applyBrushNoren,
+    applySpark: applySpark, blinkAmount: blinkAmount,
+    audioParams: audioParams, depthColor: depthColor,
+    validateManifest: validateManifest
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = RamenLogic;
+  if (typeof window !== 'undefined') window.RamenLogic = RamenLogic;
+})();
+</script>
+
+<script type="module" id="ramen-app">
+import * as THREE from 'three';
+
+/* ================= app =================
+   Wires RamenLogic (pure sim) to a Three.js WebGL2 scene.
+   Single file, no build step. All assets are local except the
+   three.js module + (lazily, on user request) the depth model. */
+const L = window.RamenLogic;
+const $ = (id) => document.getElementById(id);
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const toastEl = $('toast');
+let toastTimer = null;
+function toast(msg, ms) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms || 4200);
+}
+
+const state = {
+  sim: L.createSim(L.SEED),
+  paused: false,
+  compare: false,
+  curtainX: 0.5,
+  inspector: false,
+  inspMode: 'final',
+  audioOn: false,
+  radioOn: false,
+  drift: true,           // cinematic drift when the pointer is idle
+  pointer: { x: 0, y: 0, tx: 0, ty: 0, lastMove: 0 },
+  brush: { x: 0, y: 0, active: false },
+  fps: 0,
+};
+
+/* ---------- manifest + textures ---------- */
+let manifest = null;
+async function loadManifest() {
+  const r = await fetch('assets/manifest.json');
+  manifest = await r.json();
+  const check = L.validateManifest(manifest);
+  if (!check.ok) throw new Error('manifest invalid: ' + check.errors.join('; '));
+  return manifest;
+}
+function loadTexture(url, manager) {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader(manager).load(url, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      resolve(t);
+    }, undefined, reject);
+  });
+}
+
+/* ---------- renderer ---------- */
+let renderer = null, scene = null, camera = null, postRT = null;
+let plates = {};        // layer id -> mesh
+let norenStrips = [];   // 6 strip meshes
+let lanternGroups = []; // [rear, front]
+let water = null;       // { targetA, targetB, updateMat, ... } or CPU fallback
+let emissiveMat = null, streetMat = null, postMat = null, postScene = null, postCam = null;
+let rainLines = null, dripLines = null, steamMats = [], mistMat = null;
+let taxiGroup = null, flashQuad = null;
+let textures = {};
+
+function frameUVToPlaneLocal(u, v, z) {
+  // Frame fraction (u,v from top-left) -> local coords on the plate at depth z.
+  const s = L.plateScale(z);
+  return {
+    x: (u - 0.5) * L.PLANE_W * s,
+    y: (0.5 - v) * L.PLANE_H * s,
+  };
+}
+function plateGeometry(z, u0, u1, v0, v1, wSeg, hSeg) {
+  // Plane sized frame*scale*overscan; UVs remapped so the visible centre
+  // shows exactly the full artwork at rest. The camera sees the central
+  // 1/OVERSCAN of the plane (geometry-uv [u0i, u1i]); that window must map
+  // to texture [0,1], so texture-uv = (frame-fraction - u0i)/(u1i - u0i).
+  const s = L.plateScale(z);
+  const w = L.PLANE_W * s * L.OVERSCAN;
+  const h = L.PLANE_H * s * L.OVERSCAN;
+  const g = new THREE.PlaneGeometry(w, h, wSeg || 1, hSeg || 1);
+  const inset = L.uvInset();
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    const u = uv.getX(i), v = uv.getY(i);
+    const fU = u0 + (u1 - u0) * u, fV = v0 + (v1 - v0) * v;
+    uv.setXY(i,
+      (fU - inset.u0) / (inset.u1 - inset.u0),
+      (fV - inset.u0) / (inset.u1 - inset.u0));
+  }
+  return g;
+}
+
+/* ---------- woman rig shader ---------- */
+const WOMAN_VERT = /* glsl */`
+  uniform float uTime, uBreath, uBlink, uGazeX, uGazeY, uWind;
+  uniform vec2 uHeadPivot;   // plane-local xy of the neck pivot
+  uniform vec2 uEye0, uEye1; // plane-local xy of the eyes
+  varying vec2 vUv;
+  varying vec2 vLocal;
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+    vLocal = p.xy;
+    // Breathing: shoulders rise/fall around the shoulder line, torso widens slightly.
+    float shoulder = smoothstep(-0.45, -0.05, p.y);
+    p.y += uBreath * 0.012 * shoulder;
+    p.x *= 1.0 + uBreath * 0.004 * shoulder;
+    // Head tilt / nod around the neck pivot (chin-palm pivot).
+    vec2 rel = p.xy - uHeadPivot;
+    if (rel.y > -0.02) {
+      float ang = 0.02 * sin(uTime * 0.45) + 0.012 * sin(uTime * 1.1 + 1.3);
+      float c = cos(ang), s = sin(ang);
+      rel = vec2(c * rel.x - s * rel.y, s * rel.x + c * rel.y);
+      p.xy = uHeadPivot + rel;
+    }
+    // Hair + bangs breeze: sway grows toward the hair tips.
+    float hair = smoothstep(0.55, 0.95, uv.x) * smoothstep(0.25, 0.75, uv.y);
+    p.x += hair * uWind * 0.02 * sin(uTime * 1.3 + p.y * 6.0);
+    p.x += hair * 0.006 * sin(uTime * 2.1 + p.y * 9.0);
+    // Eye gaze: nudge the eye regions with the pointer.
+    float g0 = exp(-pow(distance(p.xy, uEye0) / 0.09, 2.0));
+    float g1 = exp(-pow(distance(p.xy, uEye1) / 0.09, 2.0));
+    p.xy += vec2(uGazeX, uGazeY) * 0.012 * (g0 + g1);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+const WOMAN_FRAG = /* glsl */`
+  uniform sampler2D uMap;
+  uniform float uBlink;
+  uniform vec2 uEye0uv, uEye1uv;
+  varying vec2 vUv;
+  varying vec2 vLocal;
+  void main() {
+    vec2 uv = vUv;
+    // Eyelid: squash the texture vertically toward each eye line as the blink closes.
+    vec2 d0 = uv - uEye0uv;
+    vec2 d1 = uv - uEye1uv;
+    float m0 = exp(-dot(d0, d0) / 0.00045);
+    float m1 = exp(-dot(d1, d1) / 0.00045);
+    float m = max(m0, m1);
+    if (m > 0.01) {
+      vec2 eye = m0 > m1 ? uEye0uv : uEye1uv;
+      uv.y = eye.y + (uv.y - eye.y) * (1.0 - 0.85 * uBlink * m);
+    }
+    vec4 c = texture2D(uMap, uv);
+    // 5-tap neighbourhood-clamped CAS sharpen on displaced pixels.
+    vec2 px = vec2(1.0 / 1920.0, 1.0 / 1080.0);
+    vec4 cL = texture2D(uMap, uv - vec2(px.x, 0.0));
+    vec4 cR = texture2D(uMap, uv + vec2(px.x, 0.0));
+    vec4 cU = texture2D(uMap, uv - vec2(0.0, px.y));
+    vec4 cD = texture2D(uMap, uv + vec2(0.0, px.y));
+    vec4 mn = min(min(min(cL, cR), cU), cD);
+    vec4 mx = max(max(max(cL, cR), cU), cD);
+    vec4 sharp = c + (c - (cL + cR + cU + cD) * 0.25) * 0.6;
+    c = clamp(sharp, mn, mx);
+    // Lid shadow while blinking.
+    c.rgb *= 1.0 - 0.25 * uBlink * m;
+    gl_FragColor = c;
+  }
+`;
+
+/* ---------- noren strip shader ---------- */
+const NOREN_VERT = /* glsl */`
+  uniform float uTime, uDefl, uWind;
+  uniform float uPhase;
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+    // Pinned at the rod (uv.y = 1), free at the hem (uv.y = 0).
+    float free = 1.0 - uv.y;
+    float wave = sin(6.2831 * (uv.x * 2.0 + uTime * 0.7 + uPhase));
+    p.z += uDefl * free * free * 0.09;
+    p.z += uWind * 0.012 * wave * free;
+    p.x += uDefl * 0.02 * free * free;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+const NOREN_FRAG = /* glsl */`
+  uniform sampler2D uMap;
+  varying vec2 vUv;
+  void main() {
+    vec4 c = texture2D(uMap, vUv);
+    if (c.a < 0.02) discard;
+    gl_FragColor = c;
+  }
+`;
+
+/* ---------- water PDE shaders ---------- */
+const WATER_UPDATE_FRAG = /* glsl */`
+  precision highp float;
+  uniform sampler2D uH;
+  uniform vec2 uTexel;
+  uniform vec3 uImpulses[8]; // x, y, amp (amp 0 = inactive)
+  varying vec2 vUv;
+  void main() {
+    float hC = texture2D(uH, vUv).r;
+    float hL = texture2D(uH, vUv - vec2(uTexel.x, 0.0)).r;
+    float hR = texture2D(uH, vUv + vec2(uTexel.x, 0.0)).r;
+    float hU = texture2D(uH, vUv + vec2(0.0, uTexel.y)).r;
+    float hD = texture2D(uH, vUv - vec2(0.0, uTexel.y)).r;
+    float v = texture2D(uH, vUv).g;
+    v += (hL + hR + hU + hD - 4.0 * hC) * 0.28;
+    v *= 0.985;
+    float h = hC + v;
+    for (int i = 0; i < 8; i++) {
+      vec3 im = uImpulses[i];
+      if (im.z > 0.001) {
+        vec2 d = (vUv - im.xy) * 256.0;
+        h += im.z * exp(-dot(d, d) / 18.0);
+      }
+    }
+    // Saturating puddle (mirrors the CPU waterStep clamp).
+    h = clamp(h, -2.0, 2.0);
+    gl_FragColor = vec4(h, v, 0.0, 1.0);
+  }
+`;
+const WATER_VERT = /* glsl */`
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+
+/* ---------- steam / mist shaders ---------- */
+const NOISE_GLSL = /* glsl */`
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x),
+               mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float a = 0.5, s = 0.0;
+    for (int i = 0; i < 3; i++) { s += a * vnoise(p); p *= 2.1; a *= 0.5; }
+    return s;
+  }
+`;
+const STEAM_FRAG = /* glsl */`
+  uniform float uTime, uAmount, uSwirl;
+  uniform vec2 uSwirlDir;
+  varying vec2 vUv;
+  ${NOISE_GLSL}
+  void main() {
+    vec2 p = vUv * vec2(2.0, 3.0);
+    p.y += uTime * 0.25;
+    p += uSwirlDir * uSwirl * 0.6;
+    float n = fbm(p + vec2(0.0, -uTime * 0.35));
+    float n2 = fbm(p * 1.7 + vec2(3.7, -uTime * 0.5));
+    float body = smoothstep(0.35, 0.75, n * 0.65 + n2 * 0.35);
+    float edge = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x)
+               * smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
+    float a = body * edge * uAmount * 0.5;
+    gl_FragColor = vec4(vec3(0.92, 0.94, 1.0), a);
+  }
+`;
+const STEAM_VERT = /* glsl */`
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+
+/* ---------- post shader ---------- */
+const POST_FRAG = /* glsl */`
+  uniform sampler2D uTex;
+  uniform sampler2D uOrig;
+  uniform float uTime, uFlash, uCurtainOn, uCurtainX, uHeat;
+  uniform vec2 uBowlUV;
+  uniform vec2 uRes;
+  varying vec2 vUv;
+  void main() {
+    vec2 uv = vUv;
+    // Stove / bowl thermal heat-haze: rising refractive wobble above the bowl.
+    vec2 d = uv - uBowlUV;
+    float heatMask = exp(-dot(d, d) / 0.004) * uHeat;
+    uv.x += sin(uv.y * 42.0 + uTime * 3.0) * 0.0016 * heatMask;
+    uv.y += sin(uv.x * 55.0 + uTime * 2.2) * 0.0012 * heatMask;
+    // 5-tap CAS sharpen (subtle).
+    vec2 px = 1.0 / uRes;
+    vec4 c = texture2D(uTex, uv);
+    vec4 avg = (texture2D(uTex, uv - vec2(px.x, 0.0)) + texture2D(uTex, uv + vec2(px.x, 0.0))
+              + texture2D(uTex, uv - vec2(0.0, px.y)) + texture2D(uTex, uv + vec2(0.0, px.y))) * 0.25;
+    c = c + (c - avg) * 0.35;
+    // Sheet-lightning flash, brighter toward the sky.
+    c.rgb += vec3(0.75, 0.85, 1.0) * uFlash * (0.35 + 0.65 * uv.y);
+    // Before/After compare curtain: left = original still, right = live 3D.
+    if (uCurtainOn > 0.5) {
+      float side = step(uCurtainX, gl_FragCoord.x / uRes.x);
+      vec4 orig = texture2D(uOrig, vUv);
+      c = mix(orig, c, side);
+    }
+    // Gentle vignette.
+    float vig = 1.0 - 0.12 * dot(vUv - 0.5, vUv - 0.5) * 4.0;
+    c.rgb *= vig;
+    // The buffer holds linear values (built-in materials skip the sRGB
+    // encode when rendering to a render target); encode on the way out.
+    c.rgb = mix(c.rgb * 12.92,
+      1.055 * pow(c.rgb, vec3(1.0 / 2.4)) - 0.055,
+      step(0.0031308, c.rgb));
+    gl_FragColor = c;
+  }
+`;
+
+/* ---------- scene build ---------- */
+function buildPlates() {
+  const inset = L.uvInset();
+  // Static plates (layer0, layer1-static variant for layer2, layer3).
+  const defs = [
+    { id: 'layer0', tex: 'layer0', z: -0.36 },
+    { id: 'layer1', tex: 'layer1', z: -0.05 },
+    { id: 'layer3', tex: 'layer3', z: 0.20 },
+  ];
+  for (const d of defs) {
+    const tex = textures[d.tex];
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    const mesh = new THREE.Mesh(plateGeometry(d.z, 0, 1, 0, 1), mat);
+    mesh.position.z = d.z;
+    mesh.renderOrder = d.z < 0 ? 0 : 2;
+    mesh.userData.layerId = d.id;
+    scene.add(mesh);
+    plates[d.id] = mesh;
+  }
+  // layer2 static (noren panels punched out) + 6 cloth strips.
+  const tex2 = textures['layer2static'];
+  const mat2 = new THREE.MeshBasicMaterial({ map: tex2, transparent: true, depthWrite: false });
+  const mesh2 = new THREE.Mesh(plateGeometry(0.15, 0, 1, 0, 1), mat2);
+  mesh2.position.z = 0.15;
+  mesh2.renderOrder = 1;
+  mesh2.userData.layerId = 'layer2';
+  scene.add(mesh2);
+  plates['layer2'] = mesh2;
+  buildNorenStrips();
+  // Woman + counter: Live2D rig (128x72 segments).
+  const anchors = manifest.anchors;
+  const eyeUV = anchors.eyes.map((e) => [e[0] / 1920, 1 - e[1] / 1080]);
+  const z4 = 0.34, s4 = L.plateScale(z4);
+  const w4 = L.PLANE_W * s4 * L.OVERSCAN, h4 = L.PLANE_H * s4 * L.OVERSCAN;
+  const geo4 = new THREE.PlaneGeometry(w4, h4, 128, 72);
+  const uv4 = geo4.attributes.uv;
+  for (let i = 0; i < uv4.count; i++) {
+    const u = uv4.getX(i), v = uv4.getY(i);
+    uv4.setXY(i, (u - inset.u0) / (inset.u1 - inset.u0), (v - inset.u0) / (inset.u1 - inset.u0));
+  }
+  // Neck pivot at frame (1630, 640): u = 0.849, v = 1 - 640/1080 = 0.407.
+  // Plane-local coords: local = (uTex - 0.5) * planeSize.
+  const pivotU = inset.u0 + (inset.u1 - inset.u0) * (1630 / 1920);
+  const pivotV = inset.u0 + (inset.u1 - inset.u0) * (1 - 640 / 1080);
+  const headPivot = { x: (pivotU - 0.5) * w4, y: (pivotV - 0.5) * h4 };
+  const eyeLocal = eyeUV.map(([eu, ev]) => {
+    const tu = inset.u0 + (inset.u1 - inset.u0) * eu;
+    const tv = inset.u0 + (inset.u1 - inset.u0) * ev;
+    return new THREE.Vector2((tu - 0.5) * w4, (tv - 0.5) * h4);
+  });
+  const womanMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: textures['layer4'] },
+      uTime: { value: 0 }, uBreath: { value: 0 }, uBlink: { value: 0 },
+      uGazeX: { value: 0 }, uGazeY: { value: 0 }, uWind: { value: 0.35 },
+      uHeadPivot: { value: new THREE.Vector2(headPivot.x, headPivot.y) },
+      uEye0: { value: eyeLocal[0] }, uEye1: { value: eyeLocal[1] },
+      uEye0uv: { value: new THREE.Vector2(eyeUV[0][0], eyeUV[0][1]) },
+      uEye1uv: { value: new THREE.Vector2(eyeUV[1][0], eyeUV[1][1]) },
+    },
+    vertexShader: WOMAN_VERT,
+    fragmentShader: WOMAN_FRAG,
+    transparent: true, depthWrite: false,
+  });
+  const mesh4 = new THREE.Mesh(geo4, womanMat);
+  mesh4.position.z = z4;
+  mesh4.renderOrder = 3;
+  mesh4.userData.layerId = 'layer4';
+  scene.add(mesh4);
+  plates['layer4'] = mesh4;
+  plates['layer4'].userData.womanMat = womanMat;
+}
+
+function buildNorenStrips() {
+  // Six cloth strips across the noren panels (frame x 785..1295, two panels).
+  const panels = [
+    { x0: 785, x1: 1040, yTop: 55, yBot0: 730, yBot1: 695 },
+    { x0: 1055, x1: 1295, yTop: 55, yBot0: 700, yBot1: 680 },
+  ];
+  const z = 0.15, s = L.plateScale(z);
+  let stripIndex = 0;
+  for (const p of panels) {
+    for (let k = 0; k < 3; k++) {
+      const f0 = k / 3, f1 = (k + 1) / 3;
+      const x0 = p.x0 + (p.x1 - p.x0) * f0, x1 = p.x0 + (p.x1 - p.x0) * f1;
+      const yB0 = p.yBot0 + (p.yBot1 - p.yBot0) * f0;
+      const yB1 = p.yBot0 + (p.yBot1 - p.yBot0) * f1;
+      // Grid 13 x 9 in plane-local coords (frame fractions -> local).
+      const cols = 13, rows = 9;
+      const pos = [], uvArr = [], idx = [];
+      for (let r = 0; r < rows; r++) {
+        const vr = r / (rows - 1); // 0 = bottom, 1 = top
+        for (let c = 0; c < cols; c++) {
+          const fc = c / (cols - 1);
+          const fx = x0 + (x1 - x0) * fc;
+          const yBot = yB0 + (yB1 - yB0) * fc;
+          const fy = yBot + (p.yTop - yBot) * vr;
+          const u = fx / 1920, v = 1 - fy / 1080;
+          pos.push((u - 0.5) * L.PLANE_W * s, (0.5 - v) * L.PLANE_H * s, 0);
+          // Texture uv = frame fraction (layer2 is a full-frame texture).
+          uvArr.push(u, v);
+        }
+      }
+      for (let r = 0; r < rows - 1; r++) {
+        for (let c = 0; c < cols - 1; c++) {
+          const a = r * cols + c, b = a + 1, d2 = a + cols, e = d2 + 1;
+          idx.push(a, d2, b, b, d2, e);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uMap: { value: textures['layer2'] },
+          uTime: { value: 0 }, uDefl: { value: 0 },
+          uWind: { value: 0.35 }, uPhase: { value: stripIndex * 0.35 },
+        },
+        vertexShader: NOREN_VERT,
+        fragmentShader: NOREN_FRAG,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(g, mat);
+      mesh.position.z = z + 0.001;
+      mesh.renderOrder = 2;
+      mesh.userData.stripIndex = stripIndex;
+      mesh.userData.layerId = 'layer2';
+      scene.add(mesh);
+      norenStrips.push(mesh);
+      stripIndex++;
+    }
+  }
+}
+
+function buildLanterns() {
+  // Swing each full-frame lantern plate around its ceiling hook.
+  // Pivots come from the manifest (hardcoded fallback = same numbers).
+  const a = manifest.anchors || {};
+  const defs = [
+    { id: 'layer1', pivot: a.lantern_rear_pivot || [1405, 120], z: -0.05 },
+    { id: 'layer3', pivot: a.lantern_front_pivot || [445, 0], z: 0.20 },
+  ];
+  for (const d of defs) {
+    const mesh = plates[d.id];
+    scene.remove(mesh);
+    const local = frameUVToPlaneLocal(d.pivot[0] / 1920, d.pivot[1] / 1080, d.z);
+    const group = new THREE.Group();
+    group.position.set(local.x, local.y, d.z);
+    mesh.position.set(-local.x, -local.y, 0);
+    group.add(mesh);
+    group.userData.layerId = d.id;
+    scene.add(group);
+    lanternGroups.push(group);
+  }
+}
+
+/* ---------- water PDE (GPU ping-pong, CPU fallback) ---------- */
+function buildWater() {
+  const N = 256;
+  const hasFloatRT = !!renderer.extensions.has('EXT_color_buffer_float');
+  if (!hasFloatRT) {
+    // CPU fallback: the sim owns the heightfield (sim.water, 32x32); the
+    // render loop only uploads it as a texture. No second copy here.
+    water = { cpu: true, n: state.sim.water.n };
+    return;
+  }
+  const opts = {
+    type: THREE.HalfFloatType, format: THREE.RGBAFormat,
+    minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+    depthBuffer: false, stencilBuffer: false,
+  };
+  const tA = new THREE.WebGLRenderTarget(N, N, opts);
+  const tB = new THREE.WebGLRenderTarget(N, N, opts);
+  // Clear both to zero.
+  const zeroScene = new THREE.Scene();
+  const zeroCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const zeroMat = new THREE.ShaderMaterial({
+    vertexShader: WATER_VERT,
+    fragmentShader: 'void main() { gl_FragColor = vec4(0.0); }',
+  });
+  const zeroQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), zeroMat);
+  zeroScene.add(zeroQuad);
+  renderer.setRenderTarget(tA); renderer.render(zeroScene, zeroCam);
+  renderer.setRenderTarget(tB); renderer.render(zeroScene, zeroCam);
+  renderer.setRenderTarget(null);
+  const updateMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uH: { value: tA.texture },
+      uTexel: { value: new THREE.Vector2(1 / N, 1 / N) },
+      uImpulses: { value: Array.from({ length: 8 }, () => new THREE.Vector3(0, 0, 0)) },
+    },
+    vertexShader: WATER_VERT,
+    fragmentShader: WATER_UPDATE_FRAG,
+  });
+  const updateScene = new THREE.Scene();
+  updateScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), updateMat));
+  water = {
+    cpu: false, n: N, tA, tB, updateMat, updateScene,
+    cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+    cur: 0,
+  };
+}
+function waterStepGPU(impulses) {
+  if (!water || water.cpu) return;
+  const ims = water.updateMat.uniforms.uImpulses.value;
+  for (let i = 0; i < 8; i++) {
+    const s = impulses[i];
+    if (s) { ims[i].set(s.x, s.y, s.amp); } else { ims[i].set(0, 0, 0); }
+  }
+  const src = water.cur === 0 ? water.tA : water.tB;
+  const dst = water.cur === 0 ? water.tB : water.tA;
+  water.updateMat.uniforms.uH.value = src.texture;
+  renderer.setRenderTarget(dst);
+  renderer.render(water.updateScene, water.cam);
+  renderer.setRenderTarget(null);
+  water.cur = 1 - water.cur;
+}
+function waterTexture() {
+  if (!water) return null;
+  if (water.cpu) return null; // CPU path draws its own overlay via DataTexture (below)
+  return (water.cur === 0 ? water.tA : water.tB).texture;
+}
+
+/* ---------- street reflection overlay ---------- */
+const STREET_FRAG = /* glsl */`
+  uniform sampler2D uBg, uWater, uEmissive, uStreetMask;
+  uniform float uTime, uFlicker, uBrownout, uCpuWater;
+  uniform sampler2D uCpuWaterTex;
+  uniform vec2 uCpuTexel;
+  uniform vec2 uInset;
+  varying vec2 vUv;    // raw frame fraction [0,1]
+  void main() {
+    // Texture UVs: vUv is the geometry uv; the frame fraction is
+    // (vUv - u0)/(u1 - u0), and the full-frame textures sample at the fraction.
+    vec2 tuv = (vUv - uInset.x) / (uInset.y - uInset.x);
+    float street = texture2D(uStreetMask, tuv).r;
+    if (street < 0.02) discard;
+    vec2 huv = vec2(tuv.x / 0.36, tuv.y / 0.352);
+    huv = clamp(huv, 0.0, 1.0);
+    vec2 grad = vec2(0.0);
+    if (uCpuWater > 0.5) {
+      vec2 tx = vec2(uCpuTexel.x, 0.0), ty = vec2(0.0, uCpuTexel.y);
+      grad = vec2(
+        texture2D(uCpuWaterTex, huv + tx).r - texture2D(uCpuWaterTex, huv - tx).r,
+        texture2D(uCpuWaterTex, huv + ty).r - texture2D(uCpuWaterTex, huv - ty).r) * 2.0;
+    } else {
+      vec2 tx = vec2(1.0 / 256.0, 0.0), ty = vec2(0.0, 1.0 / 256.0);
+      grad = vec2(
+        texture2D(uWater, huv + tx).r - texture2D(uWater, huv - tx).r,
+        texture2D(uWater, huv + ty).r - texture2D(uWater, huv - ty).r) * 2.0;
+    }
+    vec2 distort = grad * 0.03;
+    vec3 bg = texture2D(uBg, tuv + distort).rgb;
+    float em = texture2D(uEmissive, tuv).r;
+    vec3 refl = bg * (1.0 + em * (1.2 + 0.8 * uFlicker) * (1.0 - 0.7 * uBrownout));
+    refl += vec3(0.10, 0.13, 0.20); // wet sky sheen
+    vec3 col = mix(bg * 0.55, refl, 0.75);
+    gl_FragColor = vec4(col, street * 0.85);
+  }
+`;
+const STREET_VERT = /* glsl */`
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+function buildStreet() {
+  // Full-frame plane at the backdrop's depth; the street mask clips it.
+  // (A sub-region plane would misalign by the overscan factor.)
+  const z = -0.359;
+  const g = plateGeometry(z, 0, 1, 0, 1);
+  // plateGeometry remaps UVs to the inset range; for this shader we need
+  // the raw frame fraction, so restore plain [0,1] UVs.
+  const uv = g.attributes.uv;
+  const pos = g.attributes.position;
+  const w = L.PLANE_W * L.plateScale(z) * L.OVERSCAN;
+  const h = L.PLANE_H * L.plateScale(z) * L.OVERSCAN;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5);
+  }
+  const inset = L.uvInset();
+  streetMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uBg: { value: textures['layer0'] },
+      uWater: { value: null },
+      uEmissive: { value: textures['mask-emissive'] },
+      uStreetMask: { value: textures['mask-street'] },
+      uTime: { value: 0 }, uFlicker: { value: 1 },
+      uBrownout: { value: 0 }, uCpuWater: { value: 0 },
+      uCpuWaterTex: { value: null },
+      uCpuTexel: { value: new THREE.Vector2(1 / 32, 1 / 32) },
+      uInset: { value: new THREE.Vector2(inset.u0, inset.u1) },
+    },
+    vertexShader: STREET_VERT,
+    fragmentShader: STREET_FRAG,
+    transparent: true, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(g, streetMat);
+  mesh.position.z = z;
+  mesh.renderOrder = 1;
+  scene.add(mesh);
+}
+
+/* ---------- emissive overlay (neon glow, per-sign flicker) ---------- */
+const EMISSIVE_FRAG = /* glsl */`
+  uniform sampler2D uSrc, uMask, uSignMap;
+  uniform float uSigns[7];
+  uniform float uBrownout, uOnly;
+  varying vec2 vUv;
+  void main() {
+    float m = texture2D(uMask, vUv).r;
+    if (m < 0.02) discard;
+    float idx = texture2D(uSignMap, vUv).r * 255.0;
+    float b = 1.0;
+    if (idx > 0.5 && idx < 1.5) b = uSigns[0];
+    else if (idx > 1.5 && idx < 2.5) b = uSigns[1];
+    else if (idx > 2.5 && idx < 3.5) b = uSigns[2];
+    else if (idx > 3.5 && idx < 4.5) b = uSigns[3];
+    else if (idx > 4.5 && idx < 5.5) b = uSigns[4];
+    else if (idx > 5.5 && idx < 6.5) b = uSigns[5];
+    else if (idx > 6.5) b = uSigns[6];
+    b *= (1.0 - 0.7 * uBrownout);
+    vec3 src = texture2D(uSrc, vUv).rgb;
+    vec3 col = src * (1.0 + 1.6 * b * m);
+    if (uOnly > 0.5) {
+      gl_FragColor = vec4(col * m * b, 1.0);
+    } else {
+      gl_FragColor = vec4(col * m * b * 0.55, 1.0);
+    }
+  }
+`;
+function buildSignMap() {
+  // Offscreen canvas: each emissive region gets a gray level 1..7.
+  const c = document.createElement('canvas');
+  c.width = 1920; c.height = 1080;
+  const x = c.getContext('2d');
+  x.fillStyle = '#000'; x.fillRect(0, 0, 1920, 1080);
+  const boxes = [
+    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
+    [430, 560, 500, 740], [1500, 120, 1830, 230],
+  ];
+  boxes.forEach(([x0, y0, x1, y1], i) => {
+    x.fillStyle = `rgb(${i + 1},${i + 1},${i + 1})`;
+    x.fillRect(x0, y0, x1 - x0, y1 - y0);
+  });
+  const ell = (cx, cy, rx, ry, v) => {
+    x.fillStyle = `rgb(${v},${v},${v})`;
+    x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fill();
+  };
+  ell(445, 175, 118, 180, 6);  // front lantern
+  ell(1405, 255, 75, 125, 7);  // rear lantern
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+function buildEmissive() {
+  emissiveMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSrc: { value: textures['source'] },
+      uMask: { value: textures['mask-emissive'] },
+      uSignMap: { value: buildSignMap() },
+      uSigns: { value: [1, 1, 1, 1, 1, 1, 1] },
+      uBrownout: { value: 0 }, uOnly: { value: 0 },
+    },
+    vertexShader: STEAM_VERT,
+    fragmentShader: EMISSIVE_FRAG,
+    transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const mesh = new THREE.Mesh(plateGeometry(0.5, 0, 1, 0, 1), emissiveMat);
+  mesh.position.z = 0.5;
+  mesh.renderOrder = 8;
+  scene.add(mesh);
+  emissiveMat.userData.mesh = mesh;
+}
+
+/* ---------- rain + drips (line segments, CPU-driven from the sim) ---------- */
+function buildRainLines() {
+  const mk = (count) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 6), 3));
+    const m = new THREE.ShaderMaterial({
+      uniforms: { uMask: { value: textures['mask-rain'] }, uColor: { value: new THREE.Color(0.75, 0.85, 1.0) }, uOpacity: { value: 0.55 } },
+      vertexShader: /* glsl */`
+        attribute vec2 aUv2;
+        varying vec2 vUv2;
+        void main() { vUv2 = aUv2; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+      `,
+      fragmentShader: /* glsl */`
+        uniform sampler2D uMask; uniform vec3 uColor; uniform float uOpacity;
+        varying vec2 vUv2;
+        void main() {
+          float m = texture2D(uMask, vUv2).r;
+          if (m < 0.4) discard;
+          gl_FragColor = vec4(uColor, uOpacity * m);
+        }
+      `,
+      transparent: true, depthWrite: false,
+    });
+    g.setAttribute('aUv2', new THREE.BufferAttribute(new Float32Array(count * 4), 2));
+    const lines = new THREE.LineSegments(g, m);
+    lines.frustumCulled = false;
+    lines.renderOrder = 6;
+    scene.add(lines);
+    return lines;
+  };
+  rainLines = mk(600);
+  dripLines = mk(16);
+  dripLines.material.uniforms.uOpacity.value = 0.8;
+}
+function syncRainLines() {
+  const sim = state.sim, p = sim.params;
+  const pos = rainLines.geometry.attributes.position.array;
+  const uv2 = rainLines.geometry.attributes.aUv2.array;
+  const active = Math.floor(600 * p.rain);
+  for (let i = 0; i < 600; i++) {
+    const d = sim.rain[i];
+    const on = i < active;
+    const x0 = (d.x - 0.5) * L.PLANE_W, y0 = (0.5 - d.y) * L.PLANE_H;
+    const x1 = x0 - Math.tan(d.slant) * d.len * L.PLANE_H, y1 = y0 + d.len * L.PLANE_H;
+    pos[i * 6] = on ? x0 : 0; pos[i * 6 + 1] = on ? y0 : -10; pos[i * 6 + 2] = 0.3;
+    pos[i * 6 + 3] = on ? x1 : 0; pos[i * 6 + 4] = on ? y1 : -10; pos[i * 6 + 5] = 0.3;
+    uv2[i * 4] = d.x; uv2[i * 4 + 1] = 1 - d.y;
+    uv2[i * 4 + 2] = d.x; uv2[i * 4 + 3] = 1 - d.y;
+  }
+  rainLines.geometry.attributes.position.needsUpdate = true;
+  rainLines.geometry.attributes.aUv2.needsUpdate = true;
+  const dp = dripLines.geometry.attributes.position.array;
+  const du = dripLines.geometry.attributes.aUv2.array;
+  for (let i = 0; i < 16; i++) {
+    const d = sim.drips[i];
+    const on = d.wait <= 0;
+    const x0 = (d.x - 0.5) * L.PLANE_W, y0 = (0.5 - d.y) * L.PLANE_H;
+    dp[i * 6] = on ? x0 : 0; dp[i * 6 + 1] = on ? y0 : -10; dp[i * 6 + 2] = 0.3;
+    dp[i * 6 + 3] = on ? x0 : 0; dp[i * 6 + 4] = on ? y0 + 0.02 : -10; dp[i * 6 + 5] = 0.3;
+    du[i * 4] = d.x; du[i * 4 + 1] = 1 - d.y;
+    du[i * 4 + 2] = d.x; du[i * 4 + 3] = 1 - d.y;
+  }
+  dripLines.geometry.attributes.position.needsUpdate = true;
+  dripLines.geometry.attributes.aUv2.needsUpdate = true;
+}
+
+/* ---------- steam + mist ---------- */
+function buildSteamMist() {
+  const anchors = manifest.anchors;
+  const bowlU = anchors.bowl_center[0] / 1920, bowlV = 1 - anchors.bowl_center[1] / 1080;
+  const s = L.plateScale(0.34);
+  const mkSteam = (wFrac, hFrac, cxU, cyV) => {
+    const w = L.PLANE_W * wFrac * s, h = L.PLANE_H * hFrac * s;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uAmount: { value: 0.5 }, uSwirl: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(0, 0) } },
+      vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
+      transparent: true, depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    mesh.position.set((cxU - 0.5) * L.PLANE_W * s, (0.5 - cyV) * L.PLANE_H * s, 0.36);
+    mesh.renderOrder = 7;
+    scene.add(mesh);
+    steamMats.push(mat);
+    return mesh;
+  };
+  mkSteam(0.16, 0.30, bowlU, bowlV - 0.14);  // bowl steam
+  mkSteam(0.10, 0.18, 0.60, 0.55);           // pot / interior steam
+  // Alley mist: wide soft plane over the street.
+  const mistMat2 = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uAmount: { value: 0.16 }, uSwirl: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(1, 0) } },
+    vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
+    transparent: true, depthWrite: false,
+  });
+  const mist = new THREE.Mesh(new THREE.PlaneGeometry(L.PLANE_W * 0.42, L.PLANE_H * 0.4), mistMat2);
+  mist.position.set(-L.PLANE_W * 0.28, -L.PLANE_H * 0.22, -0.2);
+  mist.renderOrder = 5;
+  scene.add(mist);
+  mistMat = mistMat2;
+}
+
+/* ---------- taxi + lightning ---------- */
+function buildTaxi() {
+  const g = new THREE.Group();
+  const glowTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 128;
+    const x = c.getContext('2d');
+    const grd = x.createRadialGradient(128, 64, 4, 128, 64, 120);
+    grd.addColorStop(0, 'rgba(255, 220, 150, 0.9)');
+    grd.addColorStop(0.5, 'rgba(255, 190, 100, 0.35)');
+    grd.addColorStop(1, 'rgba(255, 180, 80, 0)');
+    x.fillStyle = grd; x.fillRect(0, 0, 256, 128);
+    const t = new THREE.CanvasTexture(c);
+    return t;
+  })();
+  const mat = new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  for (let i = 0; i < 2; i++) {
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(0.9, 0.45, 1);
+    sp.position.set(i === 0 ? -0.35 : 0.35, 0, 0);
+    g.add(sp);
+  }
+  g.position.set(-2, -0.62, 0.1);
+  g.visible = false;
+  scene.add(g);
+  taxiGroup = g;
+}
+
+/* ---------- post pass ---------- */
+function buildPost() {
+  const w = Math.floor(renderer.domElement.width);
+  const h = Math.floor(renderer.domElement.height);
+  postRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.UnsignedByteType, depthBuffer: true });
+  postScene = new THREE.Scene();
+  postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const bowlUV = new THREE.Vector2(
+    manifest.anchors.bowl_center[0] / 1920,
+    1 - manifest.anchors.bowl_center[1] / 1080);
+  postMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTex: { value: postRT.texture },
+      uOrig: { value: textures['source'] },
+      uTime: { value: 0 }, uFlash: { value: 0 },
+      uCurtainOn: { value: 0 }, uCurtainX: { value: 0.5 },
+      uHeat: { value: 0.5 },
+      uBowlUV: { value: bowlUV },
+      uRes: { value: new THREE.Vector2(w, h) },
+    },
+    vertexShader: WATER_VERT,
+    fragmentShader: POST_FRAG,
+    depthTest: false, depthWrite: false,
+  });
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
+}
+
+/* ---------- procedural audio (Web Audio only, zero audio files) ---------- */
+const AudioEngine = {
+  ctx: null, master: null, nodes: {}, radioTimer: null,
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AC();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.9;
+    this.master.connect(this.ctx.destination);
+    this.nodes.pan = this.ctx.createStereoPanner();
+    this.nodes.pan.connect(this.master);
+    this._noiseBuffer = this._makeNoise(2);
+    this._startRain();
+    this._startSimmer();
+    this._startBuzz();
+  },
+  _makeNoise(seconds) {
+    const len = Math.floor(this.ctx.sampleRate * seconds);
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  },
+  _loopNoise() {
+    const s = this.ctx.createBufferSource();
+    s.buffer = this._noiseBuffer; s.loop = true;
+    return s;
+  },
+  _startRain() {
+    const src = this._loopNoise();
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.4;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200;
+    const g = this.ctx.createGain(); g.gain.value = 0.0;
+    src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(this.nodes.pan);
+    src.start();
+    this.nodes.rain = g;
+  },
+  _startSimmer() {
+    const src = this._loopNoise();
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320;
+    const g = this.ctx.createGain(); g.gain.value = 0.0;
+    src.connect(lp); lp.connect(g); g.connect(this.nodes.pan);
+    src.start();
+    this.nodes.simmer = g;
+    // Slow bubble blips.
+    this.nodes.bubbleTimer = setInterval(() => {
+      if (!state.audioOn) return;
+      const t = this.ctx.currentTime + Math.random() * 0.4;
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(180 + Math.random() * 160, t);
+      o.frequency.exponentialRampToValueAtTime(60, t + 0.09);
+      const og = this.ctx.createGain();
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(0.05, t + 0.02);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(og); og.connect(this.nodes.pan);
+      o.start(t); o.stop(t + 0.15);
+    }, 700);
+  },
+  _startBuzz() {
+    const o = this.ctx.createOscillator();
+    o.type = 'sawtooth'; o.frequency.value = 120;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+    const g = this.ctx.createGain(); g.gain.value = 0.0;
+    o.connect(lp); lp.connect(g); g.connect(this.nodes.pan);
+    o.start();
+    this.nodes.buzz = g;
+  },
+  blip(freq0, freq1, dur, gain, pan) {
+    if (!this.ctx || !state.audioOn) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(freq0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, freq1), t + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const p = this.ctx.createStereoPanner(); p.pan.value = pan || 0;
+    o.connect(g); g.connect(p); p.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  },
+  crackle() {
+    if (!this.ctx || !state.audioOn) return;
+    const t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource();
+    s.buffer = this._noiseBuffer;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'highpass'; bp.frequency.value = 2500;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    s.connect(bp); bp.connect(g); g.connect(this.master);
+    s.start(t, Math.random()); s.stop(t + 0.1);
+  },
+  thunder() {
+    if (!this.ctx || !state.audioOn) return;
+    const t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource();
+    s.buffer = this._noiseBuffer; s.loop = true;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(420, t);
+    lp.frequency.exponentialRampToValueAtTime(70, t + 2.8);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.0);
+    s.connect(lp); lp.connect(g); g.connect(this.master);
+    s.start(t); s.stop(t + 3.1);
+  },
+  whoosh() {
+    if (!this.ctx || !state.audioOn) return;
+    const t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource();
+    s.buffer = this._noiseBuffer; s.loop = true;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(300, t);
+    bp.frequency.exponentialRampToValueAtTime(1400, t + 2.0);
+    bp.frequency.exponentialRampToValueAtTime(300, t + 4.0);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 1.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 4.0);
+    s.connect(bp); bp.connect(g); g.connect(this.master);
+    s.start(t); s.stop(t + 4.1);
+  },
+  setParams(ap) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.nodes.rain.gain.setTargetAtTime(ap.rainGain * 0.5, t, 0.4);
+    this.nodes.simmer.gain.setTargetAtTime(ap.simmerGain * 0.5, t, 0.4);
+    this.nodes.buzz.gain.setTargetAtTime(ap.buzzGain, t, 0.4);
+    this.nodes.pan.pan.setTargetAtTime(ap.pan, t, 0.3);
+  },
+  startRadio() {
+    if (!this.ctx || this.radioTimer) return;
+    // Kitchen Lo-Fi Radio: mellow Am7 - Fmaj7 - Cmaj7 - G6 pad + vinyl crackle.
+    const chords = [
+      [57, 60, 64, 67], [53, 57, 60, 65], [48, 55, 60, 64], [55, 59, 62, 64],
+    ];
+    let ci = 0;
+    const note = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+    const playChord = () => {
+      if (!state.radioOn) return;
+      const t = this.ctx.currentTime;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 1.2);
+      g.gain.setValueAtTime(0.05, t + 2.6);
+      g.gain.linearRampToValueAtTime(0.0001, t + 4.0);
+      lp.connect(g); g.connect(this.master);
+      for (const m of chords[ci % 4]) {
+        const o = this.ctx.createOscillator();
+        o.type = 'triangle'; o.frequency.value = note(m); o.detune.value = (Math.random() - 0.5) * 8;
+        o.connect(lp); o.start(t); o.stop(t + 4.1);
+      }
+      ci++;
+      this.radioTimer = setTimeout(playChord, 4000);
+    };
+    playChord();
+    // Vinyl crackle ticks.
+    this.nodes.crackleTimer = setInterval(() => {
+      if (!state.radioOn) return;
+      if (Math.random() < 0.6) this.crackle();
+    }, 380);
+  },
+  stopRadio() {
+    clearTimeout(this.radioTimer); this.radioTimer = null;
+    clearInterval(this.nodes.crackleTimer);
+  },
+};
+
+/* ---------- in-browser depth (lazy, on user request) ---------- */
+let depthWorker = null;
+function estimateDepthLive() {
+  const status = $('depth-status');
+  if (depthWorker) { status.textContent = '深度模型執行中…'; return; }
+  status.textContent = '正在下載深度模型（約 27 MB，第一次）…';
+  const workerSrc = `
+    importScripts('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
+    let est = null;
+    onmessage = async (e) => {
+      try {
+        if (!est) {
+          const { pipeline, env } = Transformers;
+          env.allowLocalModels = false;
+          est = await pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small',
+            { dtype: 'q8', progress_callback: (p) => postMessage({ type: 'progress', ...p }) });
+        }
+        const { data, width, height } = e.data;
+        const img = new Transformers.RawImage(new Uint8Array(data), width, height, 4);
+        const out = await est(img);
+        const depth = out.depth; // RawImage grayscale
+        postMessage({ type: 'done', width: depth.width, height: depth.height,
+          data: depth.data.buffer }, [depth.data.buffer]);
+      } catch (err) {
+        postMessage({ type: 'error', message: String(err && err.message || err) });
+      }
+    };
+  `;
+  try {
+    depthWorker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })));
+  } catch (err) {
+    status.textContent = 'Worker 無法建立 — 仍可使用離線深度圖';
+    return;
+  }
+  depthWorker.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === 'progress') {
+      if (m.status === 'downloading' || m.status === 'progress') {
+        status.textContent = `下載深度模型… ${Math.round((m.progress || 0))}%`;
+      } else if (m.status === 'ready') {
+        status.textContent = '模型就緒，估算深度中…';
+      }
+    } else if (m.type === 'done') {
+      const view = $('depthview');
+      const c = document.createElement('canvas');
+      c.width = m.width; c.height = m.height;
+      const ctx = c.getContext('2d');
+      const imgData = ctx.createImageData(m.width, m.height);
+      const gray = new Uint8Array(m.data);
+      for (let i = 0; i < gray.length; i++) {
+        const v = gray[i];
+        const col = L.depthColor(v / 255);
+        imgData.data[i * 4] = col[0]; imgData.data[i * 4 + 1] = col[1];
+        imgData.data[i * 4 + 2] = col[2]; imgData.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      view.src = c.toDataURL('image/png');
+      view.classList.remove('hidden');
+      status.textContent = `即時深度估算完成（${m.width}×${m.height}，裝置內執行）`;
+    } else if (m.type === 'error') {
+      status.textContent = '即時估算失敗 — 仍可使用離線深度圖';
+      depthWorker = null;
+    }
+  };
+  depthWorker.onerror = () => {
+    status.textContent = '深度模型載入失敗 — 仍可使用離線深度圖';
+    depthWorker = null;
+  };
+  // Send the source art as RGBA pixels.
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height);
+    depthWorker.postMessage({ data: d.data.buffer, width: c.width, height: c.height }, [d.data.buffer]);
+    status.textContent = '圖片已送入模型…';
+  };
+  img.onerror = () => { status.textContent = '無法讀取原圖'; depthWorker = null; };
+  img.src = 'assets/source-art.png';
+}
+
+/* ---------- HUD + interaction ---------- */
+const sliders = ['rain', 'wind', 'flicker', 'steam', 'parallax'];
+function readSliders() {
+  const p = {};
+  for (const k of sliders) p[k] = parseFloat($('s-' + k).value);
+  p.lightning = state.sim.params.lightning;
+  return p;
+}
+function applyMood(name) {
+  const m = L.MOODS[name];
+  state.sim.mood = name;
+  for (const k of sliders) {
+    $('s-' + k).value = m[k];
+    $('o-' + k).textContent = m[k].toFixed(2);
+  }
+  state.sim.params = Object.assign({}, m);
+  document.querySelectorAll('#presets .btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mood === name);
+  });
+}
+function bindHUD() {
+  for (const k of sliders) {
+    $('s-' + k).addEventListener('input', () => {
+      $('o-' + k).textContent = parseFloat($('s-' + k).value).toFixed(2);
+      state.sim.params = readSliders();
+      document.querySelectorAll('#presets .btn').forEach((b) => b.classList.remove('active'));
+    });
+  }
+  document.querySelectorAll('#presets .btn').forEach((b) => {
+    b.addEventListener('click', () => applyMood(b.dataset.mood));
+  });
+  $('btn-reset').addEventListener('click', () => {
+    applyMood('drizzle');
+    state.sim.events.lightning = 0;
+    toast('已重設為毛毛雨');
+  });
+  $('btn-lightning').addEventListener('click', () => {
+    state.sim.events.lightning = 0.0001;
+    if (state.audioOn) AudioEngine.thunder();
+  });
+  $('btn-radio').addEventListener('click', () => {
+    state.radioOn = !state.radioOn;
+    $('btn-radio').classList.toggle('active', state.radioOn);
+    if (state.radioOn) {
+      AudioEngine.init();
+      AudioEngine.ctx.resume();
+      AudioEngine.startRadio();
+      toast('Kitchen Lo-Fi Radio 開啟中…');
+    } else {
+      AudioEngine.stopRadio();
+    }
+  });
+  $('btn-audio').addEventListener('click', toggleAudio);
+  $('btn-compare').addEventListener('click', () => setCompare(!state.compare));
+  $('btn-inspector').addEventListener('click', () => setInspector(!state.inspector));
+  $('btn-hide').addEventListener('click', () => {
+    document.querySelectorAll('.hud').forEach((el) => el.classList.add('hidden'));
+    toast('按 H 恢復介面');
+  });
+  $('btn-depth-live').addEventListener('click', estimateDepthLive);
+  document.querySelectorAll('#insp-modes .btn').forEach((b) => {
+    b.addEventListener('click', () => setInspectorMode(b.dataset.mode));
+  });
+  // Layer toggles (built from the manifest).
+  const wrap = $('insp-layers');
+  for (const [id, info] of Object.entries(manifest.layers)) {
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true;
+    cb.addEventListener('change', () => {
+      setLayerVisible(id, cb.checked);
+      label.classList.toggle('off', !cb.checked);
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(id + ' z=' + info.z));
+    wrap.appendChild(label);
+  }
+  // Keyboard shortcuts.
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k === 'c') setCompare(!state.compare);
+    else if (k === 'h') document.querySelectorAll('.hud').forEach((el) => el.classList.toggle('hidden'));
+    else if (k === ' ') { e.preventDefault(); state.paused = !state.paused; toast(state.paused ? '已暫停' : '繼續播放'); }
+    else if (k === 'm') toggleAudio();
+    else if (k === 'd') setInspector(!state.inspector);
+  });
+  // Pointer parallax + interactions on the canvas.
+  const el = renderer.domElement;
+  const updatePointer = (cx, cy) => {
+    const r = el.getBoundingClientRect();
+    state.pointer.tx = clamp01((cx - r.left) / r.width) * 2 - 1;
+    state.pointer.ty = clamp01((cy - r.top) / r.height) * 2 - 1;
+    state.pointer.lastMove = performance.now();
+  };
+  el.addEventListener('pointermove', (e) => updatePointer(e.clientX, e.clientY));
+  el.addEventListener('pointerdown', (e) => {
+    updatePointer(e.clientX, e.clientY);
+    state.brush.active = true;
+    handleTap(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerup', () => { state.brush.active = false; });
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom = Math.max(1.0, Math.min(1.18, zoom + (e.deltaY < 0 ? 0.02 : -0.02)));
+  }, { passive: false });
+  // Compare curtain drag.
+  const curtain = $('curtain');
+  let draggingCurtain = false;
+  curtain.addEventListener('pointerdown', (e) => { draggingCurtain = true; e.preventDefault(); });
+  window.addEventListener('pointermove', (e) => {
+    if (!draggingCurtain) return;
+    state.curtainX = clamp01(e.clientX / window.innerWidth);
+    curtain.style.left = (state.curtainX * 100) + '%';
+  });
+  window.addEventListener('pointerup', () => { draggingCurtain = false; });
+}
+let zoom = 1.0;
+
+function toggleAudio() {
+  AudioEngine.init();
+  if (AudioEngine.ctx.state === 'suspended') AudioEngine.ctx.resume();
+  state.audioOn = !state.audioOn;
+  $('btn-audio').textContent = state.audioOn ? '🔊 音效開' : '🔇 音效';
+  $('btn-audio').classList.toggle('active', state.audioOn);
+  if (!state.audioOn) {
+    AudioEngine.nodes.rain.gain.value = 0;
+    AudioEngine.nodes.simmer.gain.value = 0;
+    AudioEngine.nodes.buzz.gain.value = 0;
+  }
+}
+function setCompare(on) {
+  state.compare = on;
+  $('btn-compare').classList.toggle('active', on);
+  $('curtain').classList.toggle('on', on);
+  $('curtain').style.left = (state.curtainX * 100) + '%';
+  if (postMat) postMat.uniforms.uCurtainOn.value = on ? 1 : 0;
+}
+function setInspector(on) {
+  state.inspector = on;
+  $('inspector').classList.toggle('hidden', !on);
+  $('btn-inspector').classList.toggle('active', on);
+  if (on) setInspectorMode(state.inspMode);
+}
+function setInspectorMode(mode) {
+  state.inspMode = mode;
+  document.querySelectorAll('#insp-modes .btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  const dv = $('depthview');
+  if (mode === 'depth') {
+    dv.src = 'assets/depth.png';
+    dv.classList.remove('hidden');
+  } else if (mode === 'original') {
+    dv.src = 'assets/source-art.png';
+    dv.classList.remove('hidden');
+  } else if (mode === 'masks') {
+    // Masks grid: build a contact sheet from the 7 mask images.
+    const names = Object.keys(manifest.masks);
+    const c = document.createElement('canvas');
+    c.width = 640; c.height = 300;
+    const x = c.getContext('2d');
+    x.fillStyle = '#111'; x.fillRect(0, 0, 640, 300);
+    let loaded = 0;
+    names.forEach((n, i) => {
+      const im = new Image();
+      im.onload = () => {
+        const cw = 150, ch = 84;
+        const gx = 8 + (i % 4) * 158, gy = 8 + Math.floor(i / 4) * 140;
+        x.drawImage(im, gx, gy, cw, ch);
+        x.fillStyle = '#fff'; x.font = '12px sans-serif';
+        x.fillText(n.replace('mask-', ''), gx + 2, gy + ch + 14);
+        if (++loaded === names.length) dv.src = c.toDataURL('image/png');
+      };
+      im.src = 'assets/masks/' + n + '.png';
+    });
+    dv.classList.remove('hidden');
+  } else {
+    dv.classList.add('hidden');
+  }
+  if (emissiveMat) emissiveMat.uniforms.uOnly.value = mode === 'emissive' ? 1 : 0;
+  if (postMat) postMat.uniforms.uCurtainOn.value = (mode === 'final' && state.compare) ? 1 : 0;
+  // No-Post mode is honoured in the render loop (scene renders direct).
+}
+function setLayerVisible(id, on) {
+  const apply = (mesh) => { if (mesh) mesh.visible = on; };
+  if (id === 'layer2') {
+    apply(plates['layer2']);
+    norenStrips.forEach((m) => { m.visible = on; });
+  } else if (id === 'layer1' || id === 'layer3') {
+    const g = lanternGroups.find((gr) => gr.userData.layerId === id);
+    if (g) g.visible = on;
+  } else {
+    apply(plates[id]);
+  }
+}
+
+/* ---------- pointer taps: spark neon / brush noren / splash puddle ---------- */
+function handleTap(cx, cy) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const u = (cx - r.left) / r.width, v = (cy - r.top) / r.height; // v from top
+  // Neon signs (frame coords): OPEN, blue ramen, gyoza, vending, festoon.
+  const signs = [
+    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
+    [430, 560, 500, 740], [1500, 120, 1830, 230],
+  ];
+  const px = u * 1920, py = v * 1080;
+  for (let i = 0; i < signs.length; i++) {
+    const [x0, y0, x1, y1] = signs[i];
+    if (px >= x0 && px <= x1 && py >= y0 && py <= y1) {
+      L.applySpark(state.sim, i);
+      if (state.audioOn) AudioEngine.crackle();
+      toast('啪！霓虹燈跳了火花');
+      return;
+    }
+  }
+  // Noren brush: inside the curtain region -> spring impulse on nearest strip.
+  if (px >= 785 && px <= 1295 && py >= 55 && py <= 730) {
+    const panel = Math.min(5, Math.floor((px - 785) / (510 / 6)));
+    L.applyBrushNoren(state.sim, panel, 2.2);
+    return;
+  }
+  // Lantern brush: near either lantern -> swing impulse.
+  const dFront = Math.hypot(px - 445, py - 175);
+  const dRear = Math.hypot(px - 1405, py - 255);
+  if (dFront < 140) { L.applyImpulseLantern(state.sim, 1, 0.9); return; }
+  if (dRear < 120) { L.applyImpulseLantern(state.sim, 0, 0.9); return; }
+  // Street splash: inside the street region -> water impulse + drip sound.
+  if (px < 700 && py > 700) {
+    const fx = px / 1920 / 0.36, fy = (py - 700) / 380;
+    if (water && !water.cpu) {
+      pendingImpulses.push({ x: fx, y: fy, amp: 1.2 });
+    } else if (water && water.cpu) {
+      L.waterImpulse(state.sim.water.h, state.sim.water.n, fx, fy, 1.2, 0.05);
+    }
+    if (state.audioOn) AudioEngine.blip(700, 240, 0.14, 0.12, (u - 0.5) * 0.6);
+  }
+}
+
+/* ---------- per-frame sync from sim to scene ---------- */
+const pendingImpulses = []; // tap splashes, consumed by the next frame's water step
+function syncScene() {
+  const sim = state.sim, p = sim.params;
+  syncRainLines();
+  const px = state.pointer.x * p.parallax, py = -state.pointer.y * p.parallax;
+  // Parallax: plates shift by depth; camera stays fixed.
+  for (const [id, mesh] of Object.entries(plates)) {
+    const z = mesh.position.z;
+    const sh = L.plateShift(z, px, py);
+    mesh.position.x = sh.x;
+    mesh.position.y = sh.y;
+  }
+  for (const strip of norenStrips) {
+    const sh = L.plateShift(0.15, px, py);
+    strip.position.x = sh.x;
+    strip.position.y = sh.y;
+    const panel = sim.noren[strip.userData.stripIndex];
+    strip.material.uniforms.uDefl.value = panel.d;
+    strip.material.uniforms.uWind.value = p.wind;
+    strip.material.uniforms.uTime.value = sim.t;
+  }
+  // Lantern swings.
+  lanternGroups[0].rotation.z = sim.lanterns[0].a;
+  lanternGroups[1].rotation.z = sim.lanterns[1].a;
+  // Woman rig.
+  const wm = plates['layer4'].userData.womanMat;
+  if (wm) {
+    wm.uniforms.uTime.value = sim.t;
+    wm.uniforms.uBreath.value = sim.breath;
+    wm.uniforms.uBlink.value = L.blinkAmount(sim);
+    wm.uniforms.uGazeX.value = state.pointer.x * 0.8;
+    wm.uniforms.uGazeY.value = -state.pointer.y * 0.6;
+    wm.uniforms.uWind.value = p.wind;
+  }
+  // Emissive per-sign brightness.
+  if (emissiveMat) {
+    const u = emissiveMat.uniforms.uSigns.value;
+    for (let i = 0; i < 5; i++) u[i] = sim.signs[i].flicker * (0.55 + 0.45 * p.flicker) + sim.signs[i].spark * 2.0;
+    u[5] = 0.9 + 0.1 * Math.sin(sim.t * 0.8);
+    u[6] = 0.9 + 0.1 * Math.sin(sim.t * 0.8 + 2.0);
+    emissiveMat.uniforms.uBrownout.value = sim.events.lightningEnv;
+  }
+  // Street overlay.
+  if (streetMat) {
+    streetMat.uniforms.uTime.value = sim.t;
+    streetMat.uniforms.uFlicker.value = 0.5 + 0.5 * p.flicker;
+    streetMat.uniforms.uBrownout.value = sim.events.lightningEnv;
+    if (water) {
+      if (water.cpu) {
+        streetMat.uniforms.uCpuWater.value = 1;
+        const n = water.n;
+        if (!streetMat.userData.cpuTex) {
+          const tex = new THREE.DataTexture(new Uint8Array(n * n * 4), n, n, THREE.RGBAFormat);
+          tex.needsUpdate = true;
+          streetMat.userData.cpuTex = tex;
+          streetMat.uniforms.uCpuWaterTex.value = tex;
+          streetMat.uniforms.uCpuTexel.value.set(1 / n, 1 / n);
+        }
+        const tex = streetMat.userData.cpuTex;
+        const d = tex.image.data;
+        const wh = state.sim.water.h; // the sim's own heightfield (32x32)
+        for (let i = 0; i < n * n; i++) {
+          const v = Math.max(0, Math.min(255, 128 + wh[i] * 400));
+          d[i * 4] = v; d[i * 4 + 1] = v; d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+        }
+        tex.needsUpdate = true;
+      } else {
+        streetMat.uniforms.uWater.value = waterTexture();
+      }
+    }
+  }
+  // Steam / mist.
+  for (const m of steamMats) {
+    m.uniforms.uTime.value = sim.t;
+    m.uniforms.uAmount.value = p.steam;
+    m.uniforms.uSwirl.value = state.brush.active ? 1 : 0;
+    m.uniforms.uSwirlDir.value.set(state.pointer.x, -state.pointer.y);
+  }
+  if (mistMat) mistMat.uniforms.uTime.value = sim.t;
+  // Taxi.
+  if (taxiGroup) {
+    const ev = sim.events;
+    if (ev.taxi > 0) {
+      taxiGroup.visible = true;
+      const fx = -0.35 + ev.taxi * 1.7; // frame fraction
+      taxiGroup.position.x = (fx - 0.5) * L.PLANE_W;
+      taxiGroup.position.y = -0.62;
+      if (ev.taxi > 0.02 && !taxiGroup.userData.whooshed) {
+        taxiGroup.userData.whooshed = true;
+        if (state.audioOn) AudioEngine.whoosh();
+      }
+    } else {
+      taxiGroup.visible = false;
+      taxiGroup.userData.whooshed = false;
+    }
+  }
+  // Post uniforms.
+  if (postMat) {
+    postMat.uniforms.uTime.value = sim.t;
+    postMat.uniforms.uFlash.value = sim.events.lightningEnv;
+    postMat.uniforms.uCurtainX.value = state.curtainX;
+    postMat.uniforms.uHeat.value = 0.3 + 0.7 * p.steam;
+  }
+  // Drip splashes -> audio blips (from sim splash queue).
+  if (state.audioOn) {
+    for (const sp of sim.splashes) {
+      AudioEngine.blip(800 + Math.random() * 500, 260, 0.12, 0.05, (sp.x - 0.5) * 0.5);
+    }
+  }
+}
+
+/* ---------- main loop ---------- */
+let lastT = 0, fpsFrames = 0, fpsTime = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dtWall = Math.min(0.25, Math.max(0, (now - lastT) / 1000 || 0.016));
+  lastT = now;
+  // Cinematic drift when the pointer is idle.
+  const idleFor = now - state.pointer.lastMove;
+  if (idleFor > 4000 && state.drift) {
+    const t = now / 1000;
+    state.pointer.tx = 0.55 * Math.sin(t * 0.11);
+    state.pointer.ty = 0.35 * Math.sin(t * 0.073 + 2.0);
+  }
+  state.pointer.x += (state.pointer.tx - state.pointer.x) * 0.04;
+  state.pointer.y += (state.pointer.ty - state.pointer.y) * 0.04;
+  // Fixed-step advance (spiral-of-death guarded inside).
+  if (!state.paused) {
+    const res = L.advance(state.sim, dtWall);
+    if (res.discarded > 0.5) toast('掉幀保護：丟棄了 ' + res.discarded.toFixed(2) + 's 模擬時間', 2000);
+  }
+  // Water: GPU ping-pong from sim splashes + tap splashes.
+  // (CPU path needs nothing here: the sim steps its own heightfield.)
+  const imps = [];
+  for (const sp of state.sim.splashes) imps.push({ x: sp.x, y: sp.y, amp: sp.amp });
+  imps.push(...pendingImpulses);
+  pendingImpulses.length = 0;
+  if (water && !water.cpu) waterStepGPU(imps);
+  syncScene();
+  // Audio params follow the sim.
+  if (state.audioOn) AudioEngine.setParams(L.audioParams(state.sim, state.pointer.x));
+  // Render: post pass, or direct when the inspector says No-Post.
+  const noPost = state.inspector && state.inspMode === 'no-post';
+  if (noPost || !postMat) {
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+  } else {
+    renderer.setRenderTarget(postRT);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(postScene, postCam);
+  }
+  // FPS meter.
+  fpsFrames++; fpsTime += dtWall;
+  if (fpsTime >= 1) {
+    state.fps = Math.round(fpsFrames / fpsTime);
+    fpsFrames = 0; fpsTime = 0;
+    const el = $('fps');
+    if (el) el.textContent = state.fps + ' fps';
+  }
+  // Camera zoom (wheel/pinch).
+  camera.fov = 2 * Math.atan((L.PLANE_H / 2) / L.CAM_D) * 180 / Math.PI / zoom;
+  camera.updateProjectionMatrix();
+}
+
+/* ---------- CSS fallback (no WebGL) ---------- */
+function startFallback() {
+  $('loading').classList.add('hidden');
+  $('app').classList.add('hidden');
+  $('fallback').classList.remove('hidden');
+  document.querySelectorAll('.hud').forEach((el) => el.classList.add('hidden'));
+  toast('此裝置不支援 WebGL — 已切換為 CSS 視差模式');
+  const imgs = [...document.querySelectorAll('#fallback .fl')];
+  const onMove = (cx, cy) => {
+    const px = (cx / window.innerWidth) * 2 - 1;
+    const py = (cy / window.innerHeight) * 2 - 1;
+    for (const im of imgs) {
+      const z = parseFloat(im.dataset.z);
+      const sh = L.plateShift(z, px, py);
+      im.style.transform = `translate(${sh.x * 60}px, ${sh.y * 60}px)`;
+    }
+  };
+  window.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+}
+
+/* ---------- init ---------- */
+async function init() {
+  const bar = $('loadbar'), msg = $('loadmsg');
+  const setProgress = (f, m) => { bar.style.width = Math.round(f * 100) + '%'; if (m) msg.textContent = m; };
+  try {
+    setProgress(0.05, '正在讀取場景資料…');
+    await loadManifest();
+    const manager = new THREE.LoadingManager();
+    manager.onProgress = (url, loaded, total) => setProgress(0.1 + 0.8 * (loaded / total), `正在載入圖層 ${loaded}/${total}…`);
+    const files = {
+      layer0: 'assets/layers/layer0-backdrop.png',
+      layer1: 'assets/layers/layer1-rear-lantern.png',
+      layer2: 'assets/layers/layer2-noren.png',
+      layer2static: 'assets/layers/layer2-static.png',
+      layer3: 'assets/layers/layer3-front-lantern.png',
+      layer4: 'assets/layers/layer4-woman-counter.png',
+      source: 'assets/source-art.png',
+      depth: 'assets/depth.png',
+      'mask-rain': 'assets/masks/mask-rain.png',
+      'mask-dry': 'assets/masks/mask-dry.png',
+      'mask-street': 'assets/masks/mask-street.png',
+      'mask-emissive': 'assets/masks/mask-emissive.png',
+      'mask-cloth': 'assets/masks/mask-cloth.png',
+      'mask-steam': 'assets/masks/mask-steam.png',
+      'mask-flame': 'assets/masks/mask-flame.png',
+    };
+    const entries = Object.entries(files);
+    for (const [k, url] of entries) textures[k] = await loadTexture(url, manager);
+    // Depth + masks are data textures: no sRGB.
+    for (const k of ['depth', 'mask-rain', 'mask-dry', 'mask-street', 'mask-emissive', 'mask-cloth', 'mask-steam', 'mask-flame']) {
+      textures[k].colorSpace = THREE.NoColorSpace;
+    }
+    setProgress(0.92, '正在建立場景…');
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    if (!renderer.capabilities.isWebGL2) throw new Error('WebGL2 unavailable');
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    $('app').appendChild(renderer.domElement);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07080d);
+    camera = new THREE.PerspectiveCamera(
+      2 * Math.atan((L.PLANE_H / 2) / L.CAM_D) * 180 / Math.PI,
+      window.innerWidth / window.innerHeight, 0.1, 20);
+    camera.position.set(0, 0, L.CAM_D);
+    buildPlates();
+    buildLanterns();
+    buildWater();
+    buildStreet();
+    buildEmissive();
+    buildRainLines();
+    buildSteamMist();
+    buildTaxi();
+    buildPost();
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      const w = renderer.domElement.width, h = renderer.domElement.height;
+      postRT.setSize(w, h);
+      postMat.uniforms.uRes.value.set(w, h);
+    });
+    bindHUD();
+    applyMood('drizzle');
+    setProgress(1, '完成');
+    $('loading').classList.add('hidden');
+    requestAnimationFrame(loop);
+    setTimeout(() => toast('拖動滑鼠移動視角 · 點霓虹燈、撥門簾、戳水窪'), 600);
+  } catch (err) {
+    console.error(err);
+    if (err && /WebGL2|webgl|context/i.test(String(err.message || err))) {
+      startFallback();
+    } else {
+      $('loadmsg').textContent = '載入失敗：' + (err.message || err) + ' — 重新整理再試一次';
+      toast('載入失敗：' + (err.message || err));
+    }
+  }
+}
+init();
+</script>
+</body>
+</html>
