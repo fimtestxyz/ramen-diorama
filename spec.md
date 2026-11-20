@@ -704,3 +704,133 @@ NOT a measured fps gain.
 - Mobile ~390 px (not testable in the cloud browser; do not claim
   mobile works).
 - Re-check the round-2 items still hold (playlist, sliders, H).
+
+### Scene-switch 404 fix (2026-11-20, found by the Phase 2 live E2E)
+
+Live E2E 2026-11-20 17:10–17:21 verdict NOT SHIPPABLE: switching to
+osaka-cafe, kyoto-matcha, kamakura-enoden and kyoto-yasaka all failed
+with a toast "場景載入失敗：[object Event]" and reverted to ramen;
+tokyo-shotengai loaded but took 30–40 s. Steam fix, layer3 toggle
+and the ramen regression all passed.
+
+Root cause (verified against the deployed site: 75 files checked,
+exactly 4 non-200): `sceneTextureFiles` fetched
+`layers/layer2-static.png` for EVERY scene, but that file exists
+only for ramen (and shotengai has its own `layer3-static.png`).
+The four cloth-less scenes 404d, and `loadTexture` rejected with
+the raw THREE error event, which the toast stringified as
+"[object Event]". Deeper: `buildPlates` also defaulted a missing
+`manifest.cloth_layer` to `'layer2'`, so those scenes would have
+treated their real layer2 as cloth even if the file had loaded.
+
+Fix (in `index.html`, tests 59/59): new pure `clothLayerFor(def, m)`
+in the logic block — null when the registry has no cloth, otherwise
+the manifest's `cloth_layer` or the registry's cloth layer.
+`sceneTextureFiles` includes `clothStatic` only when it returns a
+layer; `buildPlates` renders the cloth-static plate only when it
+returns a layer (otherwise layer2 is a normal static plate);
+`loadTexture` now rejects with `new Error('failed to load ' + url)`
+so the toast shows a readable message. Pushed together with the
+multi-language UI below; re-test live.
+
+## Multi-language UI (2026-11-20, local only — not yet pushed or live-verified)
+
+User request 2026-11-20 17:14 (after confirming scene switching works
+on his own device): English and Japanese modes in addition to the
+current Chinese UI. Chinese stays the default.
+
+### Design
+
+- **One table, `I18N = { zh, en, ja }`, in the logic block** (94 keys).
+  Every user-facing string goes through it — HUD buttons, presets,
+  slider labels, inspector modes + layer-toggle labels (layer ids
+  themselves are technical and stay), music panel, scene picker
+  names, toasts, loading/status lines, help/shortcut text, error and
+  empty states. The app script contains NO hardcoded UI strings
+  (a smoke test asserts this: the app script, comments stripped,
+  contains zero CJK characters).
+- **Lookup: `t(lang, key, vars)`.** Falls back to zh for an unknown
+  language, returns the key itself for an unknown key (never renders
+  blank). `{var}` placeholders substitute verbatim; the caller owns
+  any punctuation around a var (e.g. the `：` / `: ` separator in
+  `depth.error` is chosen per language at the call site).
+- **Scene names live in the registry**, not the table: each `SCENES`
+  entry gained `names: { zh, en, ja }` + `emoji`. The picker option
+  text is `emoji + ' ' + sceneName(id, lang)`. The six names:
+  拉麵店 / Ramen Shop / ラーメン店； 大阪喫茶店 / Osaka Kissaten /
+  大阪喫茶店； 京都町家抹茶屋 / Kyoto Machiya Tea House /
+  京都町家抹茶屋； 鎌倉江之電 / Kamakura Enoden / 鎌倉江ノ電；
+  東京下町商店街 / Tokyo Shitamachi Street / 東京下町商店街；
+  京都八坂塔 / Kyoto Yasaka Pagoda / 京都八坂の塔.
+- **Switcher + persistence.** `<select id="sel-lang">` in `#topbtns`
+  (中文 / English / 日本語 — language names are never translated).
+  Choice persists in localStorage key `ramen-diorama.lang`
+  (`savedLang`/`validLang` in the logic block; unknown or unreadable
+  value → zh). `applyI18n()` re-renders everything immediately:
+  static `[data-i18n]` / `[data-i18n-title]` / `[data-i18n-alt]`
+  elements, scene picker options, quality options (incl. the auto
+  step-down label), audio button state, curtain label
+  (`data-label` + CSS `attr()`), depth status, loading line, music
+  panel — and sets `document.documentElement.lang` (`zh-Hant` /
+  `en` / `ja`). The font stack gained Hiragino/Yu Gothic/Meiryo so
+  Japanese renders on systems without CJK fonts.
+- **Dynamic strings are state, not text.** Depth status and loading
+  progress keep `{key, vars}` (`depthStatusState`,
+  `progressState`) and re-render through `tr()` — a language switch
+  mid-download does not leave a stale Chinese status line. All
+  `setProgress(f, message)` call sites now pass keys
+  (`load.reading`, `load.layers` with `{loaded, total}`,
+  `load.building`, `load.done`); all depth-status assignments go
+  through `setDepthStatus(key, vars)`.
+- **NOT translated (deliberate):** track titles and artist names
+  (proper names — "Kyoto" by 1000 Handz stays); the "CC BY 4.0"
+  license name and its URL (only the surrounding wording is
+  translated); technical identifiers (layer ids, inspector mode
+  values, `z=` labels); the scene header title (`sceneDef.title`
+  — the artwork's title, like a painting's name; for ramen it is
+  深夜ラーメン, for the five new scenes it is the Chinese name).
+
+### Chinese strings changed (only two, both listed)
+
+1. **Switch-scene toast.** Was `已切換到「{sceneDef.title}」` —
+   for ramen that rendered the Japanese title
+   `已切換到「深夜ラーメン」`. It now uses the translated scene
+   name, so zh shows `已切換到「深夜拉麵」`. The other five scenes
+   are unchanged (their `title` already equals their Chinese name).
+   This is the intended behaviour (toast follows the current
+   language, like the picker), not a rewording.
+2. **Panel heading.** Was `氣氛 ATMO&shy;SPHERE` (with a soft
+   hyphen for line-breaking); `textContent` cannot carry `&shy;`,
+   so it is now `氣氛 ATMOSPHERE`. Renders identically; only the
+   invisible hyphen is gone. Every other zh value is the exact
+   string the app shipped with.
+
+### Tests after this change
+
+- **57/57 JS** (`node --test test/*.test.mjs test/smoke.mjs`,
+  was 48): 5 new logic tests (default zh, full-table key parity
+  across the three languages, `t()` fallback + `{vars}`
+  substitution, all 6 scene names in all 3 languages,
+  `savedLang` round-trip + unknown/throwing storage) + 4 new smoke
+  tests (switcher exists + persists + re-renders, every
+  `data-i18n(*)` key exists in all three languages and every I18N
+  key is used somewhere, picker re-renders from scene names, no
+  hardcoded CJK in the app script). Python slice + scene tests
+  still pass. `node --check` passes on both script blocks.
+- Adding a string: add the key to ALL THREE tables in `I18N`
+  (the parity test fails otherwise), wire it with `data-i18n` /
+  `tr()`, and the coverage test fails if the key is never used.
+  See `CLAUDE.md`.
+
+### Live E2E still to check for this change (do NOT close it without this)
+
+- Switch to EN and JA: every HUD string changes (presets, sliders,
+  inspector modes, music panel, scene picker names, toasts,
+  depth status, loading line, keys hint, curtain label).
+- Persistence: pick JA, reload, still JA; pick EN, reload, still EN.
+- No overflow: Japanese strings are longer — check the 248 px
+  control panel and the 300 px music panel at ~390 px width.
+- Switch back to zh: the exact original wording returns (see the
+  two changed strings above).
+- The switch-scene toast shows the translated name in each language.
+- No console errors on a language switch mid-load or mid-download.

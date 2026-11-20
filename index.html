@@ -16,7 +16,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; background: #07080d; }
-  body { font-family: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; color: var(--text); }
+  body { font-family: "PingFang TC", "Microsoft JhengHei", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif; color: var(--text); }
   #app { position: fixed; inset: 0; }
   #app canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .hidden { display: none !important; }
@@ -105,7 +105,7 @@
     cursor: ew-resize; display: none;
   }
   #curtain::after {
-    content: "◂ 原圖 · LIVE ▸";
+    content: attr(data-label);
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     background: var(--glass); border: 1px solid var(--glass-border);
     border-radius: 8px; padding: 5px 9px; font-size: 11px; white-space: nowrap;
@@ -178,21 +178,21 @@
   <img class="fl" data-z="0.15" src="assets/layers/layer2-noren.png" alt="">
   <img class="fl" data-z="0.20" src="assets/layers/layer3-front-lantern.png" alt="">
   <img class="fl" data-z="0.34" src="assets/layers/layer4-woman-counter.png" alt="">
-  <div class="note glass">WebGL 不可用 — 以 CSS 視差顯示（移動滑鼠試試）</div>
+  <div class="note glass" data-i18n="fallback.note">WebGL 不可用 — 以 CSS 視差顯示（移動滑鼠試試）</div>
 </div>
 
 <div id="loading">
   <div class="bar"><i id="loadbar"></i></div>
-  <p id="loadmsg">正在載入圖層…</p>
+  <p id="loadmsg" data-i18n="load.initial">正在載入圖層…</p>
 </div>
 
 <div id="title" class="hud glass">
   <h1 id="scene-title">深夜ラーメン <span>· 2.5D</span></h1>
-  <p>一張圖 · 全部在你的裝置上算出來 · <span id="fps">— fps</span></p>
+  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span></p>
 </div>
 
 <div id="topbtns" class="hud">
-  <select class="btn" id="sel-scene" title="切換場景">
+  <select class="btn" id="sel-scene" data-i18n-title="scene.pickerTitle" title="切換場景">
     <option value="ramen" selected>🍜 深夜拉麵</option>
     <option value="osaka-cafe">☕ 大阪喫茶店</option>
     <option value="kyoto-matcha">🍵 京都町家抹茶屋</option>
@@ -200,11 +200,16 @@
     <option value="tokyo-shotengai">🏮 東京下町商店街</option>
     <option value="kyoto-yasaka">🗼 京都八坂塔</option>
   </select>
-  <button class="btn" id="btn-audio" title="音效 (M)">🔇 音效</button>
-  <button class="btn" id="btn-compare" title="對比原圖 (C)">◐ 對比</button>
-  <button class="btn" id="btn-inspector" title="圖層檢查器 (D)">▦ 檢查</button>
-  <button class="btn" id="btn-hide" title="隱藏介面 (H)">隱藏</button>
-  <select class="btn" id="sel-quality" title="畫質：自動會在卡頓時降級">
+  <select class="btn" id="sel-lang" data-i18n-title="app.langTitle" title="語言">
+    <option value="zh" selected>中文</option>
+    <option value="en">English</option>
+    <option value="ja">日本語</option>
+  </select>
+  <button class="btn" id="btn-audio" data-i18n-title="audio.title" title="音效 (M)">🔇 音效</button>
+  <button class="btn" id="btn-compare" data-i18n="compare.btn" data-i18n-title="compare.title" title="對比原圖 (C)">◐ 對比</button>
+  <button class="btn" id="btn-inspector" data-i18n="inspector.btn" data-i18n-title="inspector.title" title="圖層檢查器 (D)">▦ 檢查</button>
+  <button class="btn" id="btn-hide" data-i18n="hide.btn" data-i18n-title="hide.title" title="隱藏介面 (H)">隱藏</button>
+  <select class="btn" id="sel-quality" data-i18n-title="quality.title" title="畫質：自動會在卡頓時降級">
     <option value="auto" selected>畫質：自動</option>
     <option value="1">畫質：高</option>
     <option value="0.75">畫質：中</option>
@@ -213,68 +218,68 @@
 </div>
 
 <div id="presets" class="hud">
-  <button class="btn" data-mood="drizzle">🌧 毛毛雨</button>
-  <button class="btn" data-mood="typhoon">🌀 颱風</button>
-  <button class="btn" data-mood="3am">🌙 凌晨三點</button>
-  <button class="btn" data-mood="steam">♨ 蒸汽</button>
+  <button class="btn" data-mood="drizzle" data-i18n="mood.drizzle">🌧 毛毛雨</button>
+  <button class="btn" data-mood="typhoon" data-i18n="mood.typhoon">🌀 颱風</button>
+  <button class="btn" data-mood="3am" data-i18n="mood.3am">🌙 凌晨三點</button>
+  <button class="btn" data-mood="steam" data-i18n="mood.steam">♨ 蒸汽</button>
 </div>
 
 <div id="panel" class="hud glass">
-  <h2>氣氛 ATMO&shy;SPHERE</h2>
-  <label for="s-rain">雨勢 Rain <output id="o-rain">0.45</output></label>
+  <h2 data-i18n="panel.title">氣氛 ATMO&shy;SPHERE</h2>
+  <label for="s-rain"><span data-i18n="slider.rain">雨勢 Rain</span> <output id="o-rain">0.45</output></label>
   <input type="range" id="s-rain" min="0" max="1" step="0.01" value="0.45">
-  <label for="s-wind">風 Wind <output id="o-wind">0.35</output></label>
+  <label for="s-wind"><span data-i18n="slider.wind">風 Wind</span> <output id="o-wind">0.35</output></label>
   <input type="range" id="s-wind" min="0" max="1" step="0.01" value="0.35">
-  <label for="s-flicker">霓虹閃爍 Neon <output id="o-flicker">0.5</output></label>
+  <label for="s-flicker"><span data-i18n="slider.flicker">霓虹閃爍 Neon</span> <output id="o-flicker">0.5</output></label>
   <input type="range" id="s-flicker" min="0" max="1" step="0.01" value="0.5">
-  <label for="s-steam">蒸汽 Steam <output id="o-steam">0.5</output></label>
+  <label for="s-steam"><span data-i18n="slider.steam">蒸汽 Steam</span> <output id="o-steam">0.5</output></label>
   <input type="range" id="s-steam" min="0" max="1" step="0.01" value="0.5">
-  <label for="s-parallax">視差深度 Parallax <output id="o-parallax">0.8</output></label>
+  <label for="s-parallax"><span data-i18n="slider.parallax">視差深度 Parallax</span> <output id="o-parallax">0.8</output></label>
   <input type="range" id="s-parallax" min="0" max="1" step="0.01" value="0.8">
   <div class="row">
-    <button class="btn" id="btn-lightning">⚡ 打雷</button>
-    <button class="btn" id="btn-music">🎵 音樂</button>
-    <button class="btn" id="btn-reset">↺ 重設</button>
+    <button class="btn" id="btn-lightning" data-i18n="btn.lightning">⚡ 打雷</button>
+    <button class="btn" id="btn-music" data-i18n="btn.music">🎵 音樂</button>
+    <button class="btn" id="btn-reset" data-i18n="btn.reset">↺ 重設</button>
   </div>
 </div>
 
 <div id="music-panel" class="hud glass hidden">
-  <h2>音樂 MUSIC</h2>
+  <h2 data-i18n="music.title">音樂 MUSIC</h2>
   <div id="now-playing">未播放 — 選一首開始</div>
   <div class="transport">
-    <button class="btn" id="btn-prev" title="上一首">⏮</button>
-    <button class="btn" id="btn-play" title="播放 / 暫停">▶</button>
-    <button class="btn" id="btn-next" title="下一首">⏭</button>
+    <button class="btn" id="btn-prev" data-i18n-title="music.prevTitle" title="上一首">⏮</button>
+    <button class="btn" id="btn-play" data-i18n-title="music.playTitle" title="播放 / 暫停">▶</button>
+    <button class="btn" id="btn-next" data-i18n-title="music.nextTitle" title="下一首">⏭</button>
   </div>
-  <label for="s-musicvol">音量 <output id="o-musicvol">0.80</output></label>
+  <label for="s-musicvol"><span data-i18n="music.volume">音量</span> <output id="o-musicvol">0.80</output></label>
   <input type="range" id="s-musicvol" min="0" max="1" step="0.01" value="0.8">
   <ol id="track-list"></ol>
   <div class="row">
-    <button class="btn" id="btn-radio">📻 Kitchen Lo-Fi Radio（合成）</button>
+    <button class="btn" id="btn-radio" data-i18n="music.radio">📻 Kitchen Lo-Fi Radio（合成）</button>
   </div>
   <p id="music-attr">播放清單為 CC BY 4.0 授權曲目（Free Music Archive），播放時會顯示作者歸屬。</p>
 </div>
 
 <div id="inspector" class="hud glass hidden">
   <div class="modes" id="insp-modes">
-    <button class="btn active" data-mode="final">Final</button>
-    <button class="btn" data-mode="no-post">No-Post</button>
-    <button class="btn" data-mode="depth">Depth</button>
-    <button class="btn" data-mode="masks">Masks</button>
-    <button class="btn" data-mode="emissive">Emissive</button>
-    <button class="btn" data-mode="original">Original</button>
+    <button class="btn active" data-mode="final" data-i18n="mode.final">Final</button>
+    <button class="btn" data-mode="no-post" data-i18n="mode.no-post">No-Post</button>
+    <button class="btn" data-mode="depth" data-i18n="mode.depth">Depth</button>
+    <button class="btn" data-mode="masks" data-i18n="mode.masks">Masks</button>
+    <button class="btn" data-mode="emissive" data-i18n="mode.emissive">Emissive</button>
+    <button class="btn" data-mode="original" data-i18n="mode.original">Original</button>
   </div>
   <div class="layers" id="insp-layers"></div>
   <div class="depthrow">
-    <button class="btn" id="btn-depth-live">▶ 重新估深度（裝置內執行）</button>
+    <button class="btn" id="btn-depth-live" data-i18n="depth.live">▶ 重新估深度（裝置內執行）</button>
     <span id="depth-status">已載入離線深度圖</span>
   </div>
-  <img id="depthview" class="hidden" alt="depth map">
+  <img id="depthview" class="hidden" data-i18n-alt="depth.alt" alt="depth map">
 </div>
 
-<div id="curtain"></div>
+<div id="curtain" data-label="◂ 原圖 · LIVE ▸"></div>
 <div id="toast" class="hud glass hidden"></div>
-<div id="keys" class="hud"><span><kbd>C</kbd> 對比</span><span><kbd>H</kbd> 隱藏</span><span><kbd>Space</kbd> 暫停</span><span><kbd>M</kbd> 音效</span><span><kbd>D</kbd> 檢查</span></div>
+<div id="keys" class="hud"><span><kbd>C</kbd> <span data-i18n="keys.compare">對比</span></span><span><kbd>H</kbd> <span data-i18n="keys.hide">隱藏</span></span><span><kbd>Space</kbd> <span data-i18n="keys.pause">暫停</span></span><span><kbd>M</kbd> <span data-i18n="keys.audio">音效</span></span><span><kbd>D</kbd> <span data-i18n="keys.inspect">檢查</span></span></div>
 
 <script id="ramen-logic">
 /* RamenLogic — pure, testable simulation math for the ramen diorama.
@@ -323,6 +328,7 @@
      the old panels, lanterns = the old pivots/bodies. */
   var SCENES = [
     { id: 'ramen', name: '深夜拉麵', title: '深夜ラーメン', dir: 'assets',
+    emoji: '🍜', names: { zh: '深夜拉麵', en: 'Ramen Shop', ja: 'ラーメン店' },
       taxi: true,
       rig: { pivot: [1630, 640], hair: true, sigma: 0.00045 },
       cloth: { layer: 'layer2', panels: [
@@ -337,6 +343,7 @@
       street: { x0: 0, y0: 700, x1: 691.2, y1: 1080 },
       drips: { x0: 0.05, x1: 0.33, y0: 0.09, landY: 0.62 } },
     { id: 'osaka-cafe', name: '大阪喫茶店', title: '大阪喫茶店', dir: 'assets/scenes/osaka-cafe',
+      emoji: '☕', names: { zh: '大阪喫茶店', en: 'Osaka Kissaten', ja: '大阪喫茶店' },
       taxi: false,
       rig: { pivot: [1462, 689], hair: true, sigma: 0.00024 },
       cloth: null,
@@ -348,6 +355,7 @@
       street: { x0: 950, y0: 680, x1: 1900, y1: 837 },
       drips: null },
     { id: 'kyoto-matcha', name: '京都町家抹茶屋', title: '京都町家抹茶屋', dir: 'assets/scenes/kyoto-matcha',
+      emoji: '🍵', names: { zh: '京都町家抹茶屋', en: 'Kyoto Machiya Tea House', ja: '京都町家抹茶屋' },
       taxi: false,
       rig: { pivot: [773, 450], hair: false, sigma: 0.00018 },
       cloth: null,
@@ -358,6 +366,7 @@
       street: { x0: 1200, y0: 700, x1: 1737, y1: 863 },
       drips: { x0: 0.62, x1: 0.90, y0: 0.05, landY: 0.62 } },
     { id: 'kamakura-enoden', name: '鎌倉江之電', title: '鎌倉江之電', dir: 'assets/scenes/kamakura-enoden',
+      emoji: '🚃', names: { zh: '鎌倉江之電', en: 'Kamakura Enoden', ja: '鎌倉江ノ電' },
       taxi: false,
       rig: null,
       cloth: null,
@@ -368,6 +377,7 @@
       street: { x0: 1050, y0: 701, x1: 1919, y1: 1079 },
       drips: { x0: 0.55, x1: 1.0, y0: 0.05, landY: 0.62 } },
     { id: 'tokyo-shotengai', name: '東京下町商店街', title: '東京下町商店街', dir: 'assets/scenes/tokyo-shotengai',
+      emoji: '🏮', names: { zh: '東京下町商店街', en: 'Tokyo Shitamachi Street', ja: '東京下町商店街' },
       taxi: false,
       rig: null,
       cloth: { layer: 'layer3', panels: [
@@ -381,6 +391,7 @@
       street: { x0: 501, y0: 700, x1: 1499, y1: 1079 },
       drips: { x0: 0.26, x1: 0.78, y0: 0.05, landY: 0.62 } },
     { id: 'kyoto-yasaka', name: '京都八坂塔', title: '京都八坂塔', dir: 'assets/scenes/kyoto-yasaka',
+      emoji: '🗼', names: { zh: '京都八坂塔', en: 'Kyoto Yasaka Pagoda', ja: '京都八坂の塔' },
       taxi: false,
       rig: null,
       cloth: null,
@@ -914,6 +925,20 @@
     return { ok: errors.length === 0, errors: errors };
   }
 
+  /* Which layer is the cloth (noren / curtain) layer for a scene, or
+     null when the scene has no cloth. The registry is the source of
+     truth (def.cloth); the manifest's cloth_layer only overrides the
+     layer id (shotengai's cloth is layer3, ramen's is layer2 and the
+     ramen manifest predates the key, so it has none). The old code
+     defaulted a missing cloth_layer to 'layer2', which made the four
+     cloth-less scenes treat their real layer2 as cloth: the loader
+     fetched a non-existent layers/layer2-static.png (404) and the
+     whole scene switch failed with "[object Event]". */
+  function clothLayerFor(def, m) {
+    if (!def || !def.cloth) return null;
+    return (m && m.cloth_layer) || def.cloth.layer;
+  }
+
   /* Lo-fi playlist (real tracks, CC BY 4.0). Files live in
      assets/music/ and are loaded on demand when played — never
      preloaded (24 MB total). Attribution text is copied verbatim
@@ -929,6 +954,257 @@
   ];
   function playlistNext(i, n) { return (i + 1) % n; }
   function playlistPrev(i, n) { return (i - 1 + n) % n; }
+
+  /* ---------- i18n (2026-11-20) ----------
+     Three UI languages: zh (Traditional Chinese, the DEFAULT and the
+     language the app shipped in), en, ja. Every user-facing string
+     lives in this one table, keyed by a stable id; the app never
+     hardcodes UI text. Rules:
+     - zh values are the exact strings the app shipped with (do not
+       reword them when adding a key — add the en/ja translations).
+     - Do NOT translate: track titles and artist names (proper names),
+       the "CC BY 4.0" license name and its URL (only the surrounding
+       wording), and technical identifiers (layer ids, mode values).
+     - The scene header title (sceneDef.title) is the artwork's title
+       and is NOT in this table — it stays as-is in every language.
+     - {var} placeholders are substituted by t(); the value is
+       inserted verbatim, so the caller owns any punctuation around it
+       (e.g. the '：'/' : ' separator in depth.error). */
+  var LANGS = ['zh', 'en', 'ja'];
+  var DEFAULT_LANG = 'zh';
+  var LANG_STORAGE_KEY = 'ramen-diorama.lang';
+  var I18N = {
+    zh: {
+      'app.subtitle': '一張圖 · 全部在你的裝置上算出來',
+      'app.langTitle': '語言',
+      'audio.off': '🔇 音效', 'audio.on': '🔊 音效開', 'audio.title': '音效 (M)',
+      'scene.pickerTitle': '切換場景',
+      'compare.btn': '◐ 對比', 'compare.title': '對比原圖 (C)',
+      'inspector.btn': '▦ 檢查', 'inspector.title': '圖層檢查器 (D)',
+      'hide.btn': '隱藏', 'hide.title': '隱藏介面 (H)',
+      'quality.title': '畫質：自動會在卡頓時降級',
+      'quality.auto': '畫質：自動', 'quality.high': '畫質：高',
+      'quality.mid': '畫質：中', 'quality.low': '畫質：低',
+      'quality.autoTo': '畫質：自動 → {tier} {scale}×',
+      'quality.tierHigh': '高', 'quality.tierMid': '中', 'quality.tierLow': '低',
+      'mood.drizzle': '🌧 毛毛雨', 'mood.typhoon': '🌀 颱風',
+      'mood.3am': '🌙 凌晨三點', 'mood.steam': '♨ 蒸汽',
+      'panel.title': '氣氛 ATMOSPHERE',
+      'slider.rain': '雨勢 Rain', 'slider.wind': '風 Wind',
+      'slider.flicker': '霓虹閃爍 Neon', 'slider.steam': '蒸汽 Steam',
+      'slider.parallax': '視差深度 Parallax',
+      'btn.lightning': '⚡ 打雷', 'btn.music': '🎵 音樂', 'btn.reset': '↺ 重設',
+      'music.title': '音樂 MUSIC',
+      'music.notPlaying': '未播放 — 選一首開始',
+      'music.prevTitle': '上一首', 'music.playTitle': '播放 / 暫停',
+      'music.nextTitle': '下一首', 'music.volume': '音量',
+      'music.radio': '📻 Kitchen Lo-Fi Radio（合成）',
+      'music.attrDefault': '播放清單為 CC BY 4.0 授權曲目（Free Music Archive），播放時會顯示作者歸屬。',
+      'mode.final': 'Final', 'mode.no-post': 'No-Post', 'mode.depth': 'Depth',
+      'mode.masks': 'Masks', 'mode.emissive': 'Emissive', 'mode.original': 'Original',
+      'depth.live': '▶ 重新估深度（裝置內執行）',
+      'depth.offline': '已載入離線深度圖',
+      'depth.running': '深度模型執行中…',
+      'depth.downloading': '正在下載深度模型（約 27 MB，第一次）…',
+      'depth.progress': '下載深度模型… {pct}%',
+      'depth.ready': '模型就緒，估算深度中…',
+      'depth.done': '即時深度估算完成（{w}×{h}，裝置內執行）',
+      'depth.error': '即時估算失敗{err} — 仍可使用離線深度圖',
+      'depth.loadFailed': '深度模型載入失敗：{detail} — 仍可使用離線深度圖',
+      'depth.imageSent': '圖片已送入模型…',
+      'depth.unreadable': '無法讀取原圖',
+      'depth.noWorker': 'Worker 無法建立 — 仍可使用離線深度圖',
+      'depth.unknownError': '未知錯誤', 'depth.alt': '深度圖',
+      'compare.label': '◂ 原圖 · LIVE ▸',
+      'keys.compare': '對比', 'keys.hide': '隱藏', 'keys.pause': '暫停',
+      'keys.audio': '音效', 'keys.inspect': '檢查',
+      'fallback.note': 'WebGL 不可用 — 以 CSS 視差顯示（移動滑鼠試試）',
+      'load.initial': '正在載入圖層…',
+      'load.reading': '正在讀取場景資料…',
+      'load.layers': '正在載入圖層 {loaded}/{total}…',
+      'load.building': '正在建立場景…',
+      'load.done': '完成',
+      'load.failed': '載入失敗：{err} — 重新整理再試一次',
+      'toast.reset': '已重設為毛毛雨',
+      'toast.qualityAuto': '畫質：自動（卡頓時降級）',
+      'toast.qualityManual': '畫質：{tier}',
+      'toast.paused': '已暫停', 'toast.resumed': '繼續播放',
+      'toast.playFailed': '播放失敗：{err}',
+      'toast.radioOn': 'Kitchen Lo-Fi Radio 開啟中…',
+      'toast.hudRestored': '介面已恢復', 'toast.hudHidden': '按 H 恢復介面',
+      'toast.neonSpark': '啪！霓虹燈跳了火花', 'toast.splash': '水花！',
+      'toast.droppedFrames': '掉幀保護：丟棄了 {s}s 模擬時間',
+      'toast.noWebgl': '此裝置不支援 WebGL — 已切換為 CSS 視差模式',
+      'toast.sceneLoadFailed': '場景載入失敗：{err}',
+      'toast.switchedScene': '已切換到「{name}」',
+      'toast.loadFailed': '載入失敗：{err}',
+      'toast.welcome': '拖動滑鼠移動視角 · 點霓虹燈、撥門簾、戳水窪',
+      'toast.qualityStepDown': '畫質已自動降至{tier}（{scale}×）',
+      'toast.langChanged': '語言已切換'
+    },
+    en: {
+      'app.subtitle': 'One illustration · rendered entirely on your device',
+      'app.langTitle': 'Language',
+      'audio.off': '🔇 Sound', 'audio.on': '🔊 Sound on', 'audio.title': 'Sound (M)',
+      'scene.pickerTitle': 'Switch scene',
+      'compare.btn': '◐ Compare', 'compare.title': 'Compare with original (C)',
+      'inspector.btn': '▦ Inspect', 'inspector.title': 'Layer inspector (D)',
+      'hide.btn': 'Hide', 'hide.title': 'Hide interface (H)',
+      'quality.title': 'Quality: Auto lowers it when lagging',
+      'quality.auto': 'Quality: Auto', 'quality.high': 'Quality: High',
+      'quality.mid': 'Quality: Medium', 'quality.low': 'Quality: Low',
+      'quality.autoTo': 'Quality: Auto → {tier} {scale}×',
+      'quality.tierHigh': 'High', 'quality.tierMid': 'Medium', 'quality.tierLow': 'Low',
+      'mood.drizzle': '🌧 Drizzle', 'mood.typhoon': '🌀 Typhoon',
+      'mood.3am': '🌙 3AM', 'mood.steam': '♨ Steam',
+      'panel.title': 'ATMOSPHERE',
+      'slider.rain': 'Rain', 'slider.wind': 'Wind',
+      'slider.flicker': 'Neon flicker', 'slider.steam': 'Steam',
+      'slider.parallax': 'Parallax depth',
+      'btn.lightning': '⚡ Thunder', 'btn.music': '🎵 Music', 'btn.reset': '↺ Reset',
+      'music.title': 'MUSIC',
+      'music.notPlaying': 'Not playing — pick a track',
+      'music.prevTitle': 'Previous track', 'music.playTitle': 'Play / Pause',
+      'music.nextTitle': 'Next track', 'music.volume': 'Volume',
+      'music.radio': '📻 Kitchen Lo-Fi Radio (Synth)',
+      'music.attrDefault': 'Playlist tracks are CC BY 4.0 licensed (Free Music Archive); attribution is shown while a track plays.',
+      'mode.final': 'Final', 'mode.no-post': 'No-Post', 'mode.depth': 'Depth',
+      'mode.masks': 'Masks', 'mode.emissive': 'Emissive', 'mode.original': 'Original',
+      'depth.live': '▶ Re-estimate depth (on-device)',
+      'depth.offline': 'Offline depth map loaded',
+      'depth.running': 'Depth model is running…',
+      'depth.downloading': 'Downloading the depth model (about 27 MB, first time)…',
+      'depth.progress': 'Downloading the depth model… {pct}%',
+      'depth.ready': 'Model ready, estimating depth…',
+      'depth.done': 'Live depth estimate done ({w}×{h}, on-device)',
+      'depth.error': 'Live estimate failed{err} — the offline depth map is still available',
+      'depth.loadFailed': 'Depth model failed to load: {detail} — the offline depth map is still available',
+      'depth.imageSent': 'Image sent to the model…',
+      'depth.unreadable': 'Could not read the source image',
+      'depth.noWorker': 'Could not create the worker — the offline depth map is still available',
+      'depth.unknownError': 'Unknown error', 'depth.alt': 'Depth map',
+      'compare.label': '◂ Original · LIVE ▸',
+      'keys.compare': 'Compare', 'keys.hide': 'Hide', 'keys.pause': 'Pause',
+      'keys.audio': 'Sound', 'keys.inspect': 'Inspect',
+      'fallback.note': 'WebGL unavailable — showing CSS parallax (try moving your pointer)',
+      'load.initial': 'Loading layers…',
+      'load.reading': 'Reading scene data…',
+      'load.layers': 'Loading layers {loaded}/{total}…',
+      'load.building': 'Building the scene…',
+      'load.done': 'Done',
+      'load.failed': 'Load failed: {err} — refresh and try again',
+      'toast.reset': 'Reset to Drizzle',
+      'toast.qualityAuto': 'Quality: Auto (lowers when lagging)',
+      'toast.qualityManual': 'Quality: {tier}',
+      'toast.paused': 'Paused', 'toast.resumed': 'Resumed',
+      'toast.playFailed': 'Playback failed: {err}',
+      'toast.radioOn': 'Kitchen Lo-Fi Radio starting…',
+      'toast.hudRestored': 'Interface restored', 'toast.hudHidden': 'Press H to restore the interface',
+      'toast.neonSpark': 'Pop! The neon sign sparked', 'toast.splash': 'Splash!',
+      'toast.droppedFrames': 'Frame-drop guard: discarded {s}s of sim time',
+      'toast.noWebgl': 'This device does not support WebGL — switched to CSS parallax mode',
+      'toast.sceneLoadFailed': 'Scene failed to load: {err}',
+      'toast.switchedScene': 'Switched to “{name}”',
+      'toast.loadFailed': 'Load failed: {err}',
+      'toast.welcome': 'Drag to look around · tap a neon sign, brush the noren, poke a puddle',
+      'toast.qualityStepDown': 'Quality auto-lowered to {tier} ({scale}×)',
+      'toast.langChanged': 'Language switched'
+    },
+    ja: {
+      'app.subtitle': '一枚の絵 · すべてあなたのデバイスで描画',
+      'app.langTitle': '言語',
+      'audio.off': '🔇 音声', 'audio.on': '🔊 音声オン', 'audio.title': '音声 (M)',
+      'scene.pickerTitle': 'シーン切替',
+      'compare.btn': '◐ 比較', 'compare.title': '原画と比較 (C)',
+      'inspector.btn': '▦ 検査', 'inspector.title': 'レイヤー検査 (D)',
+      'hide.btn': '隠す', 'hide.title': 'インターフェースを隠す (H)',
+      'quality.title': '画質：自動はカクついたら下げる',
+      'quality.auto': '画質：自動', 'quality.high': '画質：高',
+      'quality.mid': '画質：中', 'quality.low': '画質：低',
+      'quality.autoTo': '画質：自動 → {tier} {scale}×',
+      'quality.tierHigh': '高', 'quality.tierMid': '中', 'quality.tierLow': '低',
+      'mood.drizzle': '🌧 小雨', 'mood.typhoon': '🌀 台風',
+      'mood.3am': '🌙 午前3時', 'mood.steam': '♨ 蒸気',
+      'panel.title': '雰囲気 ATMOSPHERE',
+      'slider.rain': '雨', 'slider.wind': '風',
+      'slider.flicker': 'ネオンの明滅', 'slider.steam': '蒸気',
+      'slider.parallax': '視差の深さ',
+      'btn.lightning': '⚡ 雷', 'btn.music': '🎵 音楽', 'btn.reset': '↺ リセット',
+      'music.title': '音楽 MUSIC',
+      'music.notPlaying': '未再生 — 曲を選んでください',
+      'music.prevTitle': '前の曲', 'music.playTitle': '再生 / 一時停止',
+      'music.nextTitle': '次の曲', 'music.volume': '音量',
+      'music.radio': '📻 Kitchen Lo-Fi Radio（合成）',
+      'music.attrDefault': 'プレイリストは CC BY 4.0 ライセンスの楽曲です（Free Music Archive）。再生中に帰属表示が出ます。',
+      'mode.final': '最終', 'mode.no-post': 'ポストなし', 'mode.depth': '深度',
+      'mode.masks': 'マスク', 'mode.emissive': '発光', 'mode.original': '原画',
+      'depth.live': '▶ 深度を再推定（デバイス内で実行）',
+      'depth.offline': 'オフライン深度マップを読み込み済み',
+      'depth.running': '深度モデルを実行中…',
+      'depth.downloading': '深度モデルをダウンロード中（約27MB、初回）…',
+      'depth.progress': '深度モデルをダウンロード中… {pct}%',
+      'depth.ready': 'モデルの準備ができました、深度を推定中…',
+      'depth.done': 'リアルタイム深度推定が完了しました（{w}×{h}、デバイス内で実行）',
+      'depth.error': 'リアルタイム推定に失敗しました{err} — オフライン深度マップは引き続き利用できます',
+      'depth.loadFailed': '深度モデルの読み込みに失敗しました：{detail} — オフライン深度マップは引き続き利用できます',
+      'depth.imageSent': '画像をモデルに送信しました…',
+      'depth.unreadable': '原画を読み込めませんでした',
+      'depth.noWorker': 'Worker を作成できませんでした — オフライン深度マップは引き続き利用できます',
+      'depth.unknownError': '不明なエラー', 'depth.alt': '深度マップ',
+      'compare.label': '◂ 原画 · LIVE ▸',
+      'keys.compare': '比較', 'keys.hide': '隠す', 'keys.pause': '一時停止',
+      'keys.audio': '音声', 'keys.inspect': '検査',
+      'fallback.note': 'WebGL は利用できません — CSS パララックスで表示中（ポインターを動かしてみてください）',
+      'load.initial': 'レイヤーを読み込み中…',
+      'load.reading': 'シーンデータを読み込み中…',
+      'load.layers': 'レイヤーを読み込み中 {loaded}/{total}…',
+      'load.building': 'シーンを構築中…',
+      'load.done': '完了',
+      'load.failed': '読み込みに失敗しました：{err} — 更新してもう一度お試しください',
+      'toast.reset': '小雨にリセットしました',
+      'toast.qualityAuto': '画質：自動（カクついたら下げる）',
+      'toast.qualityManual': '画質：{tier}',
+      'toast.paused': '一時停止しました', 'toast.resumed': '再開しました',
+      'toast.playFailed': '再生に失敗しました：{err}',
+      'toast.radioOn': 'Kitchen Lo-Fi Radio を開始中…',
+      'toast.hudRestored': 'インターフェースを復元しました', 'toast.hudHidden': 'Hキーでインターフェースを復元',
+      'toast.neonSpark': 'パチッ！ネオンが火花を散らした', 'toast.splash': '水しぶき！',
+      'toast.droppedFrames': 'フレーム落ち防止：{s}秒分のシミュレーション時間を破棄しました',
+      'toast.noWebgl': 'このデバイスは WebGL に対応していません — CSS パララックスに切り替えました',
+      'toast.sceneLoadFailed': 'シーンの読み込みに失敗しました：{err}',
+      'toast.switchedScene': '「{name}」に切り替えました',
+      'toast.loadFailed': '読み込みに失敗しました：{err}',
+      'toast.welcome': 'ドラッグで視点を動かす · ネオンをタップ、のれんを払う、水たまりをつつく',
+      'toast.qualityStepDown': '画質が自動で{tier}（{scale}×）に下がりました',
+      'toast.langChanged': '言語を切り替えました'
+    }
+  };
+  /* Look up a string: the requested language, falling back to zh,
+     then to the key itself (a missing key must never render blank).
+     {var} placeholders are substituted from vars. */
+  function t(lang, key, vars) {
+    var table = (I18N[lang] && I18N[lang][key] != null) ? I18N[lang] : I18N[DEFAULT_LANG];
+    var s = table[key];
+    if (s == null) return key;
+    if (vars) s = s.replace(/\{(\w+)\}/g, function (_, k) {
+      return vars[k] != null ? String(vars[k]) : '';
+    });
+    return s;
+  }
+  function validLang(v) { return LANGS.indexOf(v) >= 0 ? v : DEFAULT_LANG; }
+  /* Read the saved language from a storage-like object (localStorage
+     in the app; a stub in the tests). Never throws — an unreadable or
+     unknown value means the default. */
+  function savedLang(storage) {
+    try {
+      if (!storage) return DEFAULT_LANG;
+      return validLang(storage.getItem(LANG_STORAGE_KEY));
+    } catch (e) { return DEFAULT_LANG; }
+  }
+  function sceneName(id, lang) {
+    var def = sceneById(id);
+    return (def.names && def.names[lang]) || (def.names && def.names[DEFAULT_LANG]) || def.name;
+  }
 
   var RamenLogic = {
     SEED: SEED, DT: DT, CAM_D: CAM_D, PLANE_W: PLANE_W, PLANE_H: PLANE_H,
@@ -949,8 +1225,11 @@
     applyImpulseLantern: applyImpulseLantern, applyBrushNoren: applyBrushNoren,
     applySpark: applySpark, blinkAmount: blinkAmount,
     audioParams: audioParams, depthColor: depthColor,
-    validateManifest: validateManifest,
+    validateManifest: validateManifest, clothLayerFor: clothLayerFor,
     PLAYLIST: PLAYLIST, playlistNext: playlistNext, playlistPrev: playlistPrev,
+    LANGS: LANGS, DEFAULT_LANG: DEFAULT_LANG, LANG_STORAGE_KEY: LANG_STORAGE_KEY,
+    I18N: I18N, t: t, validLang: validLang, savedLang: savedLang,
+    sceneName: sceneName,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = RamenLogic;
   if (typeof window !== 'undefined') window.RamenLogic = RamenLogic;
@@ -993,6 +1272,80 @@ const state = {
   frameMs: 0,
 };
 
+/* ---------- i18n (2026-11-20): zh / en / ja ----------
+   The current language lives in `lang` (default zh, restored from
+   localStorage key L.LANG_STORAGE_KEY). `tr(key, vars)` is the only
+   way the app reads UI text — it delegates to L.t (the table in the
+   logic block). applyI18n() re-renders every visible string:
+   static [data-i18n] / [data-i18n-title] elements, the scene picker
+   options (emoji + translated scene name), the quality options
+   (incl. the auto step-down label), the audio button state, the
+   curtain label, the depth status, the loading line, and the music
+   panel (via updatePlaylistUI). Dynamic strings (toasts, depth
+   status, loading progress) are NOT stored as text — the code keeps
+   their {key, vars} and re-renders them through tr(), so a language
+   switch mid-download does not leave a stale Chinese status line.
+   Scene header titles (sceneDef.title) are NOT translated — they are
+   the artwork's title, like a painting's name. */
+const LANG_STORAGE_KEY = L.LANG_STORAGE_KEY;
+let lang = L.savedLang(typeof localStorage !== 'undefined' ? localStorage : null);
+const tr = (key, vars) => L.t(lang, key, vars);
+let depthStatusState = { key: 'depth.offline', vars: {} };
+function setDepthStatus(key, vars) {
+  depthStatusState = { key: key, vars: vars || {} };
+  renderDepthStatus();
+}
+function renderDepthStatus() {
+  const el = $('depth-status');
+  if (el) el.textContent = tr(depthStatusState.key, depthStatusState.vars);
+}
+let progressState = { f: 0, key: 'load.initial', vars: {} };
+function renderProgress() {
+  const bar = $('loadbar'), msg = $('loadmsg');
+  if (bar) bar.style.width = Math.round(progressState.f * 100) + '%';
+  if (msg) msg.textContent = tr(progressState.key, progressState.vars);
+}
+function renderStaticI18n() {
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = tr(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-alt]').forEach((el) => { el.alt = tr(el.dataset.i18nAlt); });
+}
+function renderSceneOptions() {
+  const sel = $('sel-scene');
+  if (!sel) return;
+  for (const opt of sel.options) {
+    const def = L.sceneById(opt.value);
+    if (def) opt.textContent = (def.emoji ? def.emoji + ' ' : '') + L.sceneName(def.id, lang);
+  }
+}
+function renderQualityOptions() {
+  const sel = $('sel-quality');
+  if (!sel) return;
+  const setOpt = (v, text) => { const o = sel.querySelector('option[value="' + v + '"]'); if (o) o.textContent = text; };
+  setOpt('1', tr('quality.high'));
+  setOpt('0.75', tr('quality.mid'));
+  setOpt('0.5', tr('quality.low'));
+  const auto = sel.querySelector('option[value="auto"]');
+  if (auto) {
+    auto.textContent = qualityMode === 'auto'
+      ? tr('quality.autoTo', { tier: qualityTierName(renderScale), scale: renderScale === 1 ? '1' : renderScale.toFixed(2).replace(/0$/, '') })
+      : tr('quality.auto');
+  }
+}
+function applyI18n() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : lang;
+  renderStaticI18n();
+  renderSceneOptions();
+  renderQualityOptions();
+  const audioBtn = $('btn-audio');
+  if (audioBtn) audioBtn.textContent = state.audioOn ? tr('audio.on') : tr('audio.off');
+  const curtain = $('curtain');
+  if (curtain) curtain.dataset.label = tr('compare.label');
+  renderDepthStatus();
+  renderProgress();
+  updatePlaylistUI();
+}
+
 /* ---------- manifest + textures (multi-scene, Phase 2) ---------- */
 let manifest = null;
 let sceneDef = L.SCENES[0];
@@ -1015,12 +1368,13 @@ async function loadSceneManifest(def) {
 /* Texture file map for a scene, from its manifest: layer + mask file
    names are per-scene (e.g. layer3-train.png vs layer3-front-lantern.png),
    so they are read from the manifest, never hardcoded. The cloth
-   static variant comes from manifest.static_file (ramen's manifest has
-   none, so it defaults to layers/layer2-static.png). */
+   static variant is included ONLY for scenes that have cloth
+   (ramen layer2, shotengai layer3) — the four cloth-less scenes have
+   no such file, and fetching it 404s the whole scene switch. */
 function sceneTextureFiles(def, m) {
   const files = {};
   for (const [id, info] of Object.entries(m.layers)) files[id] = def.dir + '/' + info.file;
-  files['clothStatic'] = def.dir + '/' + (m.static_file || 'layers/layer2-static.png');
+  if (L.clothLayerFor(def, m)) files['clothStatic'] = def.dir + '/' + (m.static_file || 'layers/layer2-static.png');
   files['source'] = m.source;
   files['depth'] = def.dir + '/depth.png';
   for (const [id, info] of Object.entries(m.masks)) files[id] = def.dir + '/' + info.file;
@@ -1032,7 +1386,7 @@ function loadTexture(url, manager) {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 4;
       resolve(t);
-    }, undefined, reject);
+    }, undefined, (e) => reject(new Error('failed to load ' + url + (e && e.type ? ' (' + e.type + ')' : ''))));
   });
 }
 
@@ -1316,7 +1670,9 @@ const POST_FRAG = /* glsl */`
 /* ---------- scene build (per-scene, Phase 2) ---------- */
 function buildPlates() {
   const inset = L.uvInset();
-  const clothLayer = manifest.cloth_layer || 'layer2';
+  // null for the four cloth-less scenes: their layer2 is a normal
+  // static plate, NOT cloth (see clothLayerFor).
+  const clothLayer = L.clothLayerFor(sceneDef, manifest);
   const zOf = (id) => manifest.layers[id].z;
   // Static plates: every layer except the cloth layer (static variant +
   // strips below) and layer4 (rig or plain plate below). Lantern
@@ -1325,7 +1681,7 @@ function buildPlates() {
   // alpha test discards AFTER the texture fetch, so this saves
   // blend/overdraw cost, not fetches (see CLAUDE.md round 2).
   for (const id of Object.keys(manifest.layers)) {
-    if (id === clothLayer || id === 'layer4') continue;
+    if ((clothLayer && id === clothLayer) || id === 'layer4') continue;
     const z = zOf(id);
     const mat = new THREE.MeshBasicMaterial({
       map: textures[id], transparent: true, depthWrite: false,
@@ -1340,15 +1696,18 @@ function buildPlates() {
   }
   // Cloth layer: static variant (panels punched out) + cloth strips.
   // (clothZ is module-level: syncScene shifts the strips with it.)
-  clothZ = zOf(clothLayer);
-  const mat2 = new THREE.MeshBasicMaterial({ map: textures['clothStatic'], transparent: true, depthWrite: false });
-  const mesh2 = new THREE.Mesh(plateGeometry(clothZ, 0, 1, 0, 1), mat2);
-  mesh2.position.z = clothZ;
-  mesh2.renderOrder = 1;
-  mesh2.userData.layerId = clothLayer;
-  scene.add(mesh2);
-  plates[clothLayer] = mesh2;
-  if (sceneDef.cloth) buildNorenStrips();
+  // Skipped entirely for cloth-less scenes.
+  if (clothLayer) {
+    clothZ = zOf(clothLayer);
+    const mat2 = new THREE.MeshBasicMaterial({ map: textures['clothStatic'], transparent: true, depthWrite: false });
+    const mesh2 = new THREE.Mesh(plateGeometry(clothZ, 0, 1, 0, 1), mat2);
+    mesh2.position.z = clothZ;
+    mesh2.renderOrder = 1;
+    mesh2.userData.layerId = clothLayer;
+    scene.add(mesh2);
+    plates[clothLayer] = mesh2;
+    if (sceneDef.cloth) buildNorenStrips();
+  }
   buildLayer4(inset);
 }
 
@@ -2161,9 +2520,8 @@ const AudioEngine = {
 /* ---------- in-browser depth (lazy, on user request) ---------- */
 let depthWorker = null;
 function estimateDepthLive() {
-  const status = $('depth-status');
-  if (depthWorker) { status.textContent = '深度模型執行中…'; return; }
-  status.textContent = '正在下載深度模型（約 27 MB，第一次）…';
+  if (depthWorker) { setDepthStatus('depth.running'); return; }
+  setDepthStatus('depth.downloading');
   // Round 1 fix — ROOT CAUSE of the live failure: the old code did
   //   importScripts('.../transformers@3.7.2/dist/transformers.min.js')
   // inside a classic worker, then read the global `Transformers`.
@@ -2202,16 +2560,16 @@ function estimateDepthLive() {
   try {
     depthWorker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })), { type: 'module' });
   } catch (err) {
-    status.textContent = 'Worker 無法建立 — 仍可使用離線深度圖';
+    setDepthStatus('depth.noWorker');
     return;
   }
   depthWorker.onmessage = (e) => {
     const m = e.data;
     if (m.type === 'progress') {
       if (m.status === 'downloading' || m.status === 'progress') {
-        status.textContent = `下載深度模型… ${Math.round((m.progress || 0))}%`;
+        setDepthStatus('depth.progress', { pct: Math.round(m.progress || 0) });
       } else if (m.status === 'ready') {
-        status.textContent = '模型就緒，估算深度中…';
+        setDepthStatus('depth.ready');
       }
     } else if (m.type === 'done') {
       const view = $('depthview');
@@ -2229,9 +2587,13 @@ function estimateDepthLive() {
       ctx.putImageData(imgData, 0, 0);
       view.src = c.toDataURL('image/png');
       view.classList.remove('hidden');
-      status.textContent = `即時深度估算完成（${m.width}×${m.height}，裝置內執行）`;
+      setDepthStatus('depth.done', { w: m.width, h: m.height });
     } else if (m.type === 'error') {
-      status.textContent = '即時估算失敗' + (m.message ? '：' + m.message : '') + ' — 仍可使用離線深度圖';
+      // The separator before the raw error message is language-
+      // dependent (': ' in English, '：' elsewhere); the key holds
+      // the {err} slot and the caller supplies the separator.
+      const errSuffix = m.message ? (lang === 'en' ? ': ' : '：') + m.message : '';
+      setDepthStatus('depth.error', { err: errSuffix });
       console.error('depth worker error:', m.message);
       depthWorker = null;
     }
@@ -2239,8 +2601,8 @@ function estimateDepthLive() {
   depthWorker.onerror = (e) => {
     // Surface the real error (round 1: the old handler swallowed it,
     // so the failure was undiagnosable from the UI alone).
-    const detail = (e && (e.message || e.filename)) || '未知錯誤';
-    status.textContent = '深度模型載入失敗：' + detail + ' — 仍可使用離線深度圖';
+    const detail = (e && (e.message || e.filename)) || tr('depth.unknownError');
+    setDepthStatus('depth.loadFailed', { detail: detail });
     console.error('depth worker load error:', e);
     depthWorker = null;
   };
@@ -2253,9 +2615,9 @@ function estimateDepthLive() {
     ctx.drawImage(img, 0, 0);
     const d = ctx.getImageData(0, 0, c.width, c.height);
     depthWorker.postMessage({ data: d.data.buffer, width: c.width, height: c.height }, [d.data.buffer]);
-    status.textContent = '圖片已送入模型…';
+    setDepthStatus('depth.imageSent');
   };
-  img.onerror = () => { status.textContent = '無法讀取原圖'; depthWorker = null; };
+  img.onerror = () => { setDepthStatus('depth.unreadable'); depthWorker = null; };
   img.src = manifest.source; // the selected scene's source art
 }
 
@@ -2303,7 +2665,7 @@ function bindHUD() {
   $('btn-reset').addEventListener('click', () => {
     applyMood('drizzle');
     state.sim.events.lightning = 0;
-    toast('已重設為毛毛雨');
+    toast(tr('toast.reset'));
   });
   $('btn-lightning').addEventListener('click', () => {
     state.sim.events.lightning = 0.0001;
@@ -2319,11 +2681,11 @@ function bindHUD() {
     if (v === 'auto') {
       qualityMode = 'auto';
       applyRenderScale(1);
-      toast('畫質：自動（卡頓時降級）');
+      toast(tr('toast.qualityAuto'));
     } else {
       qualityMode = 'manual';
       applyRenderScale(parseFloat(v));
-      toast('畫質：' + (v === '1' ? '高' : v === '0.75' ? '中' : '低'));
+      toast(tr('toast.qualityManual', { tier: v === '1' ? tr('quality.tierHigh') : v === '0.75' ? tr('quality.tierMid') : tr('quality.tierLow') }));
     }
   });
   $('btn-depth-live').addEventListener('click', estimateDepthLive);
@@ -2334,6 +2696,15 @@ function bindHUD() {
   // keeps the current mood/sliders. A failed switch leaves the picker
   // on the old scene (see switchScene).
   $('sel-scene').addEventListener('change', () => { switchScene($('sel-scene').value); });
+  // Language switcher (i18n): persists the choice, re-renders every
+  // UI string immediately (applyI18n), and confirms in the new language.
+  $('sel-lang').value = lang;
+  $('sel-lang').addEventListener('change', () => {
+    lang = L.validLang($('sel-lang').value);
+    try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch (e) {}
+    applyI18n();
+    toast(tr('toast.langChanged'));
+  });
   // Layer toggles are built per scene by buildLayerToggles() (called
   // from loadScene); they are NOT built here.
   // Keyboard shortcuts.
@@ -2342,7 +2713,7 @@ function bindHUD() {
     const k = e.key.toLowerCase();
     if (k === 'c') setCompare(!state.compare);
     else if (k === 'h') toggleHud();
-    else if (k === ' ') { e.preventDefault(); state.paused = !state.paused; toast(state.paused ? '已暫停' : '繼續播放'); }
+    else if (k === ' ') { e.preventDefault(); state.paused = !state.paused; toast(state.paused ? tr('toast.paused') : tr('toast.resumed')); }
     else if (k === 'm') toggleAudio();
     else if (k === 'd') setInspector(!state.inspector);
   });
@@ -2421,7 +2792,7 @@ function toggleAudio() {
   AudioEngine.init();
   if (AudioEngine.ctx.state === 'suspended') AudioEngine.ctx.resume();
   state.audioOn = !state.audioOn;
-  $('btn-audio').textContent = state.audioOn ? '🔊 音效開' : '🔇 音效';
+  $('btn-audio').textContent = state.audioOn ? tr('audio.on') : tr('audio.off');
   $('btn-audio').classList.toggle('active', state.audioOn);
   if (!state.audioOn) {
     AudioEngine.nodes.rain.gain.value = 0;
@@ -2470,11 +2841,11 @@ function updatePlaylistUI() {
   const t = playlistIndex >= 0 ? L.PLAYLIST[playlistIndex] : null;
   $('now-playing').textContent = t
     ? (playlistPlaying ? '▶ ' : '❚❚ ') + t.title + ' — ' + t.artist
-    : '未播放 — 選一首開始';
+    : tr('music.notPlaying');
   $('btn-play').textContent = playlistPlaying ? '❚❚' : '▶';
   $('music-attr').textContent = t
     ? t.attribution
-    : '播放清單為 CC BY 4.0 授權曲目（Free Music Archive），播放時會顯示作者歸屬。';
+    : tr('music.attrDefault');
   document.querySelectorAll('#track-list li').forEach((li) => {
     li.classList.toggle('active', parseInt(li.dataset.i, 10) === playlistIndex);
   });
@@ -2492,7 +2863,7 @@ function playTrack(i, isAutoAdvance) {
     console.error('playlist play failed:', err);
     playlistPlaying = false;
     updatePlaylistUI();
-    toast('播放失敗：' + (err && err.message ? err.message : err));
+    toast(tr('toast.playFailed', { err: err && err.message ? err.message : err }));
   });
   playlistPlaying = true;
   if (state.radioOn) setRadio(false);
@@ -2512,7 +2883,7 @@ function setRadio(on) {
     ensureAudioOn();
     if (playlistPlaying) pauseTrack();
     AudioEngine.startRadio();
-    toast('Kitchen Lo-Fi Radio 開啟中…');
+    toast(tr('toast.radioOn'));
   } else {
     AudioEngine.stopRadio();
   }
@@ -2571,8 +2942,8 @@ function setCompare(on) {
    H, and it stayed visible while the rest hid. */
 function toggleHud() {
   const hidden = document.body.classList.toggle('hud-hidden');
-  if (!hidden) toast('介面已恢復');
-  else toast('按 H 恢復介面');
+  if (!hidden) toast(tr('toast.hudRestored'));
+  else toast(tr('toast.hudHidden'));
 }
 function setInspector(on) {
   state.inspector = on;
@@ -2658,7 +3029,7 @@ function handleTap(cx, cy) {
   if (hit.kind === 'neon') {
     L.applySpark(state.sim, hit.sign);
     if (state.audioOn) AudioEngine.crackle();
-    toast('啪！霓虹燈跳了火花');
+    toast(tr('toast.neonSpark'));
     return;
   }
   if (hit.kind === 'noren') {
@@ -2678,7 +3049,7 @@ function handleTap(cx, cy) {
       L.waterImpulse(state.sim.water.h, state.sim.water.n, fx, fy, 1.2, 0.05);
     }
     L.addRing(state.sim, fx, fy, 1.2);
-    toast('水花！');
+    toast(tr('toast.splash'));
     if (state.audioOn) AudioEngine.blip(700, 240, 0.14, 0.12, (u - 0.5) * 0.6);
   }
 }
@@ -2851,7 +3222,7 @@ function syncScene() {
 // 100% / 56% / 25%. Auto mode steps down when slow and back up when
 // comfortably fast; the HUD select overrides it manually.
 let renderScale = 1, qualityMode = 'auto', qualityEvalTime = 0;
-function qualityTierName(s) { return s >= 1 ? '高' : s >= 0.75 ? '中' : '低'; }
+function qualityTierName(s) { return s >= 1 ? tr('quality.tierHigh') : s >= 0.75 ? tr('quality.tierMid') : tr('quality.tierLow'); }
 function applyRenderScale(s, isAutoStep) {
   const prev = renderScale;
   renderScale = s;
@@ -2865,14 +3236,10 @@ function applyRenderScale(s, isAutoStep) {
   // control used to show only the mode ("畫質：自動"), so an auto
   // step-down was invisible and the round-1 re-test reported "Auto
   // never stepped down". Manual mode already shows the tier via the
-  // selected option.
-  const opt = $('sel-quality') && $('sel-quality').querySelector('option[value="auto"]');
-  if (opt) {
-    opt.textContent = qualityMode === 'auto'
-      ? '畫質：自動 → ' + qualityTierName(s) + ' ' + (s === 1 ? '1' : s.toFixed(2).replace(/0$/, '')) + '×'
-      : '畫質：自動';
-  }
-  if (isAutoStep && s < prev) toast('畫質已自動降至' + qualityTierName(s) + '（' + s + '×）');
+  // selected option. renderQualityOptions() (i18n) rewrites all four
+  // option labels in the current language.
+  renderQualityOptions();
+  if (isAutoStep && s < prev) toast(tr('toast.qualityStepDown', { tier: qualityTierName(s), scale: s }));
 }
 
 /* ---------- main loop ---------- */
@@ -2900,7 +3267,7 @@ function loop(now) {
   // Fixed-step advance (spiral-of-death guarded inside).
   if (!state.paused) {
     const res = L.advance(state.sim, dtWall);
-    if (res.discarded > 0.5) toast('掉幀保護：丟棄了 ' + res.discarded.toFixed(2) + 's 模擬時間', 2000);
+    if (res.discarded > 0.5) toast(tr('toast.droppedFrames', { s: res.discarded.toFixed(2) }), 2000);
   }
   // Water: GPU ping-pong from sim splashes + tap splashes.
   // (CPU path needs nothing here: the sim steps its own heightfield.)
@@ -2955,7 +3322,7 @@ async function startFallback() {
   $('app').classList.add('hidden');
   $('fallback').classList.remove('hidden');
   document.querySelectorAll('.hud').forEach((el) => el.classList.add('hidden'));
-  toast('此裝置不支援 WebGL — 已切換為 CSS 視差模式');
+  toast(tr('toast.noWebgl'));
   // The fallback plates follow the saved scene (ramen if the manifest
   // can't be read — WebGL2 is decided before the first scene loads).
   try {
@@ -2981,10 +3348,12 @@ async function startFallback() {
 }
 
 /* ---------- scene switching (Phase 2) ---------- */
-function setProgress(f, m) {
-  const bar = $('loadbar'), msg = $('loadmsg');
-  if (bar) bar.style.width = Math.round(f * 100) + '%';
-  if (m && msg) msg.textContent = m;
+// Loading progress is state, not text: setProgress stores the i18n
+// {key, vars} and renderProgress() renders it in the current
+// language, so a language switch mid-load re-renders the line.
+function setProgress(f, key, vars) {
+  progressState = { f: f, key: key || progressState.key, vars: vars || {} };
+  renderProgress();
 }
 function disposeSceneGraph() {
   // Free the previous scene's GPU resources before building the next
@@ -3053,7 +3422,7 @@ function updateSceneChrome() {
   document.title = sceneDef.title + ' · 2.5D Diorama';
   $('sel-scene').value = sceneDef.id;
   // Depth view + status reset to the new scene's offline depth map.
-  $('depth-status').textContent = '已載入離線深度圖';
+  setDepthStatus('depth.offline');
   $('depthview').classList.add('hidden');
   if (state.inspMode !== 'final') setInspectorMode('final');
   buildFallbackImgs();
@@ -3078,10 +3447,10 @@ async function loadScene(id) {
   const isFirst = !manifest;
   try {
     $('loading').classList.remove('hidden');
-    setProgress(0.05, '正在讀取場景資料…');
+    setProgress(0.05, 'load.reading');
     const m = await loadSceneManifest(def);
     const manager = new THREE.LoadingManager();
-    manager.onProgress = (url, loaded, total) => setProgress(0.1 + 0.8 * (loaded / total), `正在載入圖層 ${loaded}/${total}…`);
+    manager.onProgress = (url, loaded, total) => setProgress(0.1 + 0.8 * (loaded / total), 'load.layers', { loaded: loaded, total: total });
     const files = sceneTextureFiles(def, m);
     // Lazy load: only this scene's assets are fetched (~7-9 MB). The
     // other five scenes (~42 MB total) are never preloaded.
@@ -3090,7 +3459,7 @@ async function loadScene(id) {
     for (const k of Object.keys(nextTextures)) {
       if (k === 'depth' || k.startsWith('mask-')) nextTextures[k].colorSpace = THREE.NoColorSpace;
     }
-    setProgress(0.92, '正在建立場景…');
+    setProgress(0.92, 'load.building');
     // Swap: dispose the old graph, then build the new one. The sim is
     // recreated for the scene (noren count, drips, taxi) while the
     // mood and sliders are preserved across the switch.
@@ -3113,12 +3482,12 @@ async function loadScene(id) {
     buildLayerToggles();
     updateSceneChrome();
     try { localStorage.setItem(SCENE_STORAGE_KEY, def.id); } catch (e) {}
-    setProgress(1, '完成');
+    setProgress(1, 'load.done');
     $('loading').classList.add('hidden');
   } catch (err) {
     console.error(err);
     $('loading').classList.add('hidden');
-    if (!isFirst) toast('場景載入失敗：' + (err.message || err));
+    if (!isFirst) toast(tr('toast.sceneLoadFailed', { err: err.message || err }));
     throw err;
   }
 }
@@ -3127,7 +3496,7 @@ async function switchScene(id) {
   const prev = state.sceneId;
   try {
     await loadScene(id);
-    toast('已切換到「' + sceneDef.title + '」');
+    toast(tr('toast.switchedScene', { name: L.sceneName(sceneDef.id, lang) }));
   } catch (err) {
     // A fetch/texture failure happens before the swap, so the old
     // scene is intact — put the picker back on it.
@@ -3138,7 +3507,10 @@ async function switchScene(id) {
 /* ---------- init ---------- */
 async function init() {
   try {
-    setProgress(0.05, '正在讀取場景資料…');
+    // i18n first: apply the saved language before the first loading
+    // line is shown, so the loading text is already translated.
+    applyI18n();
+    setProgress(0.05, 'load.reading');
     // Renderer first: bindHUD needs the canvas, and loadScene needs
     // the renderer for the water render targets and the post pass.
     // Round 2: antialias OFF. The final pass is a fullscreen post quad,
@@ -3176,14 +3548,14 @@ async function init() {
     bindHUD();
     applyMood('drizzle');
     requestAnimationFrame(loop);
-    setTimeout(() => toast('拖動滑鼠移動視角 · 點霓虹燈、撥門簾、戳水窪'), 600);
+    setTimeout(() => toast(tr('toast.welcome')), 600);
   } catch (err) {
     console.error(err);
     if (err && /WebGL2|webgl|context/i.test(String(err.message || err))) {
       startFallback();
     } else {
-      $('loadmsg').textContent = '載入失敗：' + (err.message || err) + ' — 重新整理再試一次';
-      toast('載入失敗：' + (err.message || err));
+      $('loadmsg').textContent = tr('load.failed', { err: err.message || err });
+      toast(tr('toast.loadFailed', { err: err.message || err }));
     }
   }
 }

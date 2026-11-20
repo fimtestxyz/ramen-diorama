@@ -517,3 +517,103 @@ test('phase 2: cloth layer is per-scene (ramen layer2, shotengai layer3, none el
     assert.equal(m.cloth_layer || 'layer2', L.sceneById(id).cloth.layer, `${id}: manifest cloth_layer matches registry`);
   }
 });
+
+/* ---------- scene-switch 404 fix (2026-11-20) ---------- */
+
+test('scene switch: clothLayerFor is null for cloth-less scenes, layer id otherwise', () => {
+  // Real manifests, as deployed: the four cloth-less scenes have
+  // cloth_layer null; ramen's manifest predates the key entirely.
+  for (const id of ['osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'kyoto-yasaka']) {
+    const def = L.sceneById(id);
+    const m = JSON.parse(readFileSync(path.join(root, def.dir, 'manifest.json'), 'utf8'));
+    assert.equal(L.clothLayerFor(def, m), null, `${id} must have no cloth layer`);
+  }
+  const ramen = L.sceneById('ramen');
+  const ramenM = JSON.parse(readFileSync(path.join(root, ramen.dir, 'manifest.json'), 'utf8'));
+  assert.equal(L.clothLayerFor(ramen, ramenM), 'layer2', 'ramen falls back to the registry layer');
+  const shotengai = L.sceneById('tokyo-shotengai');
+  const shotengaiM = JSON.parse(readFileSync(path.join(root, shotengai.dir, 'manifest.json'), 'utf8'));
+  assert.equal(L.clothLayerFor(shotengai, shotengaiM), 'layer3', 'shotengai uses the manifest cloth_layer');
+  // A manifest override wins over the registry, and a null manifest is safe.
+  assert.equal(L.clothLayerFor(shotengai, { cloth_layer: 'layer2' }), 'layer2');
+  assert.equal(L.clothLayerFor(ramen, null), 'layer2');
+  assert.equal(L.clothLayerFor({ cloth: null }, { cloth_layer: 'layer2' }), null, 'no registry cloth means no cloth layer, whatever the manifest says');
+});
+
+/* ---------- i18n (2026-11-20): zh / en / ja ---------- */
+
+test('i18n: default language is zh; t() returns the translated string per language', () => {
+  assert.equal(L.DEFAULT_LANG, 'zh');
+  assert.equal(L.LANGS.join(','), 'zh,en,ja');
+  assert.equal(L.t('zh', 'toast.splash'), '水花！');
+  assert.equal(L.t('en', 'toast.splash'), 'Splash!');
+  assert.equal(L.t('ja', 'toast.splash'), '水しぶき！');
+  assert.equal(L.t('zh', 'app.subtitle'), '一張圖 · 全部在你的裝置上算出來');
+  assert.equal(L.t('en', 'mood.3am'), '🌙 3AM');
+  assert.equal(L.t('ja', 'mood.3am'), '🌙 午前3時');
+});
+
+test('i18n: every key exists in all three languages, non-empty, no extras', () => {
+  const zhKeys = Object.keys(L.I18N.zh);
+  assert.ok(zhKeys.length > 50, `expected a full table, got ${zhKeys.length} keys`);
+  for (const lang of ['en', 'ja']) {
+    const keys = Object.keys(L.I18N[lang]);
+    assert.equal(keys.sort().join(','), [...zhKeys].sort().join(','), `${lang} keys must match zh exactly`);
+    for (const k of keys) {
+      assert.equal(typeof L.I18N[lang][k], 'string', `${lang}.${k} is a string`);
+      assert.ok(L.I18N[lang][k].length > 0, `${lang}.${k} is non-empty`);
+    }
+  }
+});
+
+test('i18n: t() falls back to zh for an unknown language, returns the key for an unknown key, substitutes {vars}', () => {
+  assert.equal(L.t('fr', 'toast.splash'), '水花！', 'unknown language falls back to zh');
+  assert.equal(L.t('zh', 'no.such.key'), 'no.such.key', 'unknown key returns itself, never blank');
+  assert.equal(L.t('zh', 'load.layers', { loaded: 3, total: 7 }), '正在載入圖層 3/7…');
+  assert.equal(L.t('en', 'load.layers', { loaded: 3, total: 7 }), 'Loading layers 3/7…');
+  assert.equal(L.t('ja', 'load.layers', { loaded: 3, total: 7 }), 'レイヤーを読み込み中 3/7…');
+  assert.equal(L.t('zh', 'load.layers', {}), '正在載入圖層 /…', 'a missing var substitutes empty');
+  assert.equal(L.t('en', 'depth.done', { w: 1920, h: 1080 }), 'Live depth estimate done (1920×1080, on-device)');
+});
+
+test('i18n: scene names translate in all three languages', () => {
+  const expected = {
+    'ramen': ['深夜拉麵', 'Ramen Shop', 'ラーメン店'],
+    'osaka-cafe': ['大阪喫茶店', 'Osaka Kissaten', '大阪喫茶店'],
+    'kyoto-matcha': ['京都町家抹茶屋', 'Kyoto Machiya Tea House', '京都町家抹茶屋'],
+    'kamakura-enoden': ['鎌倉江之電', 'Kamakura Enoden', '鎌倉江ノ電'],
+    'tokyo-shotengai': ['東京下町商店街', 'Tokyo Shitamachi Street', '東京下町商店街'],
+    'kyoto-yasaka': ['京都八坂塔', 'Kyoto Yasaka Pagoda', '京都八坂の塔'],
+  };
+  for (const [id, names] of Object.entries(expected)) {
+    assert.equal(L.sceneName(id, 'zh'), names[0], `${id} zh`);
+    assert.equal(L.sceneName(id, 'en'), names[1], `${id} en`);
+    assert.equal(L.sceneName(id, 'ja'), names[2], `${id} ja`);
+    // The zh name is the registry's existing `name` field — the
+    // translation table did not reword the shipped Chinese.
+    assert.equal(L.sceneById(id).names.zh, L.sceneById(id).name, `${id}: names.zh === name`);
+    assert.ok(L.sceneById(id).emoji, `${id} has a picker emoji`);
+  }
+  assert.equal(L.sceneName('ramen', 'fr'), '深夜拉麵', 'unknown language falls back to zh name');
+  assert.equal(L.sceneName('no-such-scene', 'en'), 'Ramen Shop', 'unknown scene falls back to ramen');
+});
+
+test('i18n: savedLang round-trips through storage; unknown/missing value means zh', () => {
+  const store = {};
+  const stub = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = v; },
+  };
+  assert.equal(L.savedLang(stub), 'zh', 'nothing saved yet');
+  stub.setItem(L.LANG_STORAGE_KEY, 'ja');
+  assert.equal(L.savedLang(stub), 'ja', 'ja round-trips');
+  stub.setItem(L.LANG_STORAGE_KEY, 'en');
+  assert.equal(L.savedLang(stub), 'en', 'en round-trips');
+  stub.setItem(L.LANG_STORAGE_KEY, 'xx');
+  assert.equal(L.savedLang(stub), 'zh', 'unknown value falls back to zh');
+  assert.equal(L.savedLang(null), 'zh', 'no storage at all');
+  assert.equal(L.savedLang({ getItem: () => { throw new Error('denied'); } }), 'zh', 'throwing storage');
+  assert.equal(L.validLang('ja'), 'ja');
+  assert.equal(L.validLang(''), 'zh');
+  assert.equal(L.LANG_STORAGE_KEY, 'ramen-diorama.lang');
+});

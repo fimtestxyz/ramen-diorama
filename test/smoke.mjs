@@ -146,6 +146,25 @@ test('structure: every scene manifest asset exists on disk (all 6 scenes)', () =
   assert.ok(html.includes("'layers/layer2-static.png'"), 'ramen cloth-static default literal');
 });
 
+test('structure: cloth-static is fetched and built only for cloth scenes; texture errors carry a message', () => {
+  // 2026-11-20 scene-switch 404: the old code fetched
+  // layers/layer2-static.png for every scene, so the four cloth-less
+  // scenes 404d and the whole switch failed. The file list must be
+  // gated on clothLayerFor, and buildPlates must skip the cloth block
+  // when there is no cloth layer.
+  assert.ok(html.includes("if (L.clothLayerFor(def, m)) files['clothStatic']"),
+    'clothStatic only in the file map when the scene has cloth');
+  assert.equal((html.match(/files\['clothStatic'\]/g) || []).length, 1,
+    'exactly one clothStatic entry in the file map, and it is the guarded one');
+  assert.ok(html.includes('if (clothLayer) {'), 'cloth-static plate built only when a cloth layer exists');
+  // The old failure surfaced as "[object Event]" because loadTexture
+  // rejected with the raw THREE error event. It must reject with a
+  // real Error so the toast shows a readable message.
+  assert.ok(html.includes("reject(new Error('failed to load ' + url"),
+    'loadTexture rejects with a real Error naming the URL');
+  assert.ok(!html.includes('}, undefined, reject);'), 'no bare reject passthrough remains in loadTexture');
+});
+
 test('structure: importmap pins three@0.187.0 on jsDelivr, no other CDN', () => {
   const importmap = JSON.parse(blocks[0]);
   assert.equal(importmap.imports.three,
@@ -386,4 +405,59 @@ test('phase 2: scene picker exists, switches scenes, persists the choice', () =>
   // A switch disposes the old graph instead of leaking it.
   assert.ok(html.includes('disposeSceneGraph();'), 'loadScene disposes the old graph');
   assert.ok(html.includes('function disposeSceneGraph()'), 'dispose helper exists');
+});
+
+test('i18n: language switcher exists, persists the choice, re-renders UI strings', () => {
+  assert.ok(html.includes('id="sel-lang"'), 'switcher exists');
+  for (const v of ['zh', 'en', 'ja']) assert.ok(html.includes(`value="${v}"`), `switcher offers ${v}`);
+  assert.ok(html.includes('中文') && html.includes('English') && html.includes('日本語'),
+    'switcher labels are the language names themselves');
+  assert.ok(html.includes('localStorage.setItem(LANG_STORAGE_KEY, lang)'), 'choice is persisted');
+  assert.ok(html.includes('L.savedLang('), 'saved language is restored on load');
+  assert.ok(html.includes('function applyI18n()'), 'applyI18n exists');
+  assert.ok(html.includes('applyI18n();'), 'applyI18n is called (init + language change)');
+  assert.ok(html.includes("document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : lang;"),
+    'html lang follows the language');
+  assert.ok(html.includes('<html lang="zh-Hant">'), 'default html lang is zh-Hant');
+});
+
+test('i18n: every data-i18n key in the HTML exists in I18N, and every I18N key is used', () => {
+  const used = new Set();
+  for (const m of html.matchAll(/data-i18n="([^"]+)"/g)) used.add(m[1]);
+  for (const m of html.matchAll(/data-i18n-title="([^"]+)"/g)) used.add(m[1]);
+  for (const m of html.matchAll(/data-i18n-alt="([^"]+)"/g)) used.add(m[1]);
+  assert.ok(used.size > 30, `expected many static keys, got ${used.size}`);
+  for (const k of used) {
+    assert.ok(k in L.I18N.zh, `data-i18n key ${k} must exist in I18N.zh`);
+    assert.ok(k in L.I18N.en, `data-i18n key ${k} must exist in I18N.en`);
+    assert.ok(k in L.I18N.ja, `data-i18n key ${k} must exist in I18N.ja`);
+  }
+  // Every key in the table must be reachable: either a static
+  // data-i18n(*) attribute in the HTML or a quoted use in the app —
+  // tr('key'), setDepthStatus('key', …), setProgress(…, 'key', …).
+  for (const k of Object.keys(L.I18N.zh)) {
+    const viaAttr = used.has(k);
+    const viaCode = html.includes(`'${k}'`);
+    assert.ok(viaAttr || viaCode, `I18N key ${k} is never used`);
+  }
+});
+
+test('i18n: scene picker options are re-rendered from the translated scene names', () => {
+  assert.ok(html.includes('function renderSceneOptions()'), 'renderSceneOptions exists');
+  assert.ok(html.includes('L.sceneName(def.id, lang)'), 'picker text comes from sceneName');
+  assert.ok(html.includes("(def.emoji ? def.emoji + ' ' : '')"), 'picker keeps the emoji prefix');
+  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka']) {
+    assert.ok(html.includes(`value="${id}"`), `picker still lists ${id}`);
+  }
+});
+
+test('i18n: no hardcoded Chinese UI string remains in the app script', () => {
+  const app = blocks[2];
+  // Strip comments first: the two remaining CJK lines are comments
+  // quoting the old strings (depth-worker root cause, quality label).
+  const code = app.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const cjk = code.match(/[\u4e00-\u9fff\u3040-\u30ff]/g);
+  assert.equal(cjk, null, `app script still has hardcoded CJK: ${cjk ? cjk.slice(0, 10).join('') : ''}`);
+  // And no toast() call carries a literal Chinese string.
+  assert.ok(!/toast\('[^']*[\u4e00-\u9fff]/.test(code), 'no hardcoded toast string');
 });

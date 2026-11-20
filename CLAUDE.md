@@ -240,6 +240,55 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   prototype. Assert with `.join(',')` or field-by-field, never
   `deepEqual` on a vm-produced array (the smoke test failed on
   identical contents for exactly this reason).
+- **A missing default is a 404 for the scenes that don't have the
+  thing.** The scene-switch 404 (2026-11-20 live E2E): a missing
+  `manifest.cloth_layer` defaulted to `'layer2'`, so the four
+  cloth-less scenes fetched a non-existent `layer2-static.png`
+  and the whole switch failed. A default must only apply when
+  the feature exists — the registry (`def.cloth`) decides, the
+  manifest only overrides the layer id (`clothLayerFor`). Same
+  rule as the rig: `rig: null` decides, not the manifest.
+- **Never stringify a raw error event into a toast.** THREE's
+  TextureLoader rejects with the raw load event, which has no
+  `.message`, so the toast showed "[object Event]" — a second
+  defect hiding the first. Wrap loader rejections in a real
+  `Error` naming the URL.
+
+## Multi-language UI lessons (2026-11-20, zh / en / ja)
+
+- **One table, three languages, zero hardcoded UI strings.** All
+  user-facing text lives in `I18N = { zh, en, ja }` in the logic
+  block (94 keys). `t(lang, key, vars)` falls back to zh, then to
+  the key itself — a missing key never renders blank. The app
+  script never hardcodes a UI string: a smoke test strips comments
+  from the app script and asserts zero CJK remains. If you add a
+  string, add the key to ALL THREE tables (a parity test fails
+  otherwise) and wire it with `data-i18n` / `data-i18n-title` /
+  `data-i18n-alt` or `tr()` (a coverage test fails if a key is
+  never used).
+- **Dynamic strings are state, not text.** A toast is transient, but
+  the depth status and the loading line persist on screen — so they
+  keep `{key, vars}` (`depthStatusState`, `progressState`) and
+  re-render through `tr()`. All `setProgress` call sites pass keys
+  (`load.reading`, `load.layers`, `load.building`, `load.done`);
+  all depth-status assignments go through `setDepthStatus`. Never
+  assign a literal string to `depth-status` or `loadmsg` again.
+- **Scene names live in the registry** (`names: { zh, en, ja }` +
+  `emoji` per `SCENES` entry); the picker renders
+  `emoji + ' ' + sceneName(id, lang)`. The scene header title
+  (`sceneDef.title`) is the artwork's title and is deliberately NOT
+  translated — do not "fix" it into `sceneName`.
+- **Not translated, ever:** track titles / artist names (proper
+  names), the "CC BY 4.0" name and its license URL, technical
+  identifiers (layer ids, mode values, `z=` labels).
+- **A `{var}` placeholder is substituted verbatim.** Punctuation
+  around a var belongs to the caller, not the table: the
+  `depth.error` separator is `': '` in English and `'：'`
+  elsewhere, chosen at the call site.
+- **Persistence:** `ramen-diorama.lang` in localStorage;
+  `savedLang(storage)` never throws (unknown / missing / throwing
+  storage → zh). `applyI18n()` also sets
+  `document.documentElement.lang` (`zh-Hant` / `en` / `ja`).
 
 ## Push rules (repo-wide, learned 2026-11-18)
 
