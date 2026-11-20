@@ -419,6 +419,66 @@ test('phase 2: SCENES registry has 6 scenes; ramen reproduces the old constants'
   assert.equal(L.sceneById().id, 'ramen');
 });
 
+test('lint: registry geometry matches the scene anchors in scripts/scenes.json', () => {
+  // 2026-11-20, the user's rule: when a coordinate mistake ships, add a
+  // check that catches it. Two shipped mistakes motivated this lint:
+  // (1) the v2 regeneration rewrote the scenes.json anchors but the
+  // index.html registry still pointed at the v1 art, so lanterns, steam
+  // and eyes all aimed at the wrong places; (2) the v1 matcha steam src
+  // sat 94px above the bowl, so the steam floated and the bowl never
+  // responded to taps. This test pins the registry to the anchors — the
+  // two files may not drift. What it does NOT check: whether the anchors
+  // themselves were measured right. That is verified by viewing the art
+  // (regen checklist in spec.md) — a number can be consistently wrong
+  // in both files.
+  const cfg = JSON.parse(readFileSync(path.join(root, 'scripts', 'scenes.json'), 'utf8')).scenes;
+  for (const [id, scene] of Object.entries(cfg)) {
+    const def = L.sceneById(id);
+    const a = scene.anchors || {};
+    // Steam top is the anchor every scene has; the registry must agree.
+    if (a.steam_top) assert.equal(def.steam.top.join(','), a.steam_top.join(','), `${id}: steam top`);
+    // Steam src is the steaming object itself: bowl/cup centre where the
+    // anchors name one, else directly below the top on the same x.
+    const srcName = a.bowl_center ? 'bowl_center' : a.cup_center ? 'cup_center' : null;
+    if (srcName) {
+      assert.equal(def.steam.src.join(','), a[srcName].join(','), `${id}: steam src is the ${srcName}`);
+    } else if (a.steam_top) {
+      assert.equal(def.steam.src[0], a.steam_top[0], `${id}: steam src under its top`);
+      assert.ok(def.steam.src[1] > a.steam_top[1], `${id}: steam src below its top`);
+    }
+    // Swinging lantern pivot is the hang point: x must equal the front
+    // lantern anchor, y must be the top edge (0).
+    if (def.lanterns.length && a.lantern_front_pivot) {
+      assert.equal(def.lanterns[0].pivot[0], a.lantern_front_pivot[0], `${id}: lantern pivot x`);
+      assert.equal(def.lanterns[0].pivot[1], 0, `${id}: lantern pivot hangs from the top`);
+    }
+    // Rig pivot is derived from the eyes: midpoint x, eye y + 1.2x the
+    // eye separation (the derivation rule from the registry update).
+    if (def.rig && a.eyes) {
+      const [e0, e1] = a.eyes;
+      const midX = (e0[0] + e1[0]) / 2;
+      const sep = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]);
+      const eyeY = (e0[1] + e1[1]) / 2;
+      assert.ok(Math.abs(def.rig.pivot[0] - midX) <= 5, `${id}: rig pivot x near eye midpoint`);
+      assert.ok(Math.abs(def.rig.pivot[1] - (eyeY + 1.2 * sep)) <= 5, `${id}: rig pivot y from eyes`);
+    }
+    // Cloth panels must be the slicer's punch polygons: same count, same
+    // x-extent and top per panel, bottom corners in the same order.
+    if (def.cloth && scene.punch_polys) {
+      assert.equal(def.cloth.panels.length, scene.punch_polys.length, `${id}: panel count`);
+      scene.punch_polys.forEach((poly, i) => {
+        const p = def.cloth.panels[i];
+        const xs = poly.map((pt) => pt[0]); const ys = poly.map((pt) => pt[1]);
+        assert.equal(p.x0, Math.min(...xs), `${id}: panel ${i} x0`);
+        assert.equal(p.x1, Math.max(...xs), `${id}: panel ${i} x1`);
+        assert.equal(p.yTop, Math.min(...ys), `${id}: panel ${i} yTop`);
+        assert.equal(p.yBot0, poly[3][1], `${id}: panel ${i} yBot0 (bottom-left)`);
+        assert.equal(p.yBot1, poly[2][1], `${id}: panel ${i} yBot1 (bottom-right)`);
+      });
+    }
+  }
+});
+
 test('phase 2: steamPlaneRect puts the steam above the source (ramen fix)', () => {
   // The old code passed a texture-v (from the bottom) where a frame
   // fraction from the top was expected, mirroring the bowl steam to
@@ -438,15 +498,21 @@ test('phase 2: steamPlaneRect puts the steam above the source (ramen fix)', () =
 });
 
 test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
-  // Shotengai noren is on layer3, 3 panels = 9 strips: left edge
-  // strip 0, middle strip 4, right panel strip 7. (400,400) hits the
-  // oden sign first — signs take precedence over the noren.
-  assert.equal(L.classifyTap(150, 400, 'tokyo-shotengai').panel, 0);
-  const n4 = L.classifyTap(280, 400, 'tokyo-shotengai');
-  assert.equal(n4.kind, 'noren'); assert.equal(n4.panel, 4);
-  const n7 = L.classifyTap(400, 500, 'tokyo-shotengai');
+  // Shotengai noren is on layer3, 3 panels = 9 strips (v2 panels
+  // x 0..135, 135..340, 340..620; the tap maps PER PANEL, 3 strips
+  // each, matching buildNorenStrips — a uniform division across the
+  // rod would mis-assign taps by a strip on unequal panels):
+  // left edge strip 0, strip 5, strip 7. (610,400) hits the oden
+  // sign first — signs take precedence over the noren.
+  assert.equal(L.classifyTap(20, 400, 'tokyo-shotengai').panel, 0);
+  const n5 = L.classifyTap(310, 400, 'tokyo-shotengai');
+  assert.equal(n5.kind, 'noren'); assert.equal(n5.panel, 5);
+  // (300,400) is the discriminating case: uniform mapping would say
+  // strip 4, per-panel mapping says 5 (panel 1, third third).
+  assert.equal(L.classifyTap(300, 400, 'tokyo-shotengai').panel, 5);
+  const n7 = L.classifyTap(515, 500, 'tokyo-shotengai');
   assert.equal(n7.kind, 'noren'); assert.equal(n7.panel, 7);
-  assert.equal(L.classifyTap(400, 400, 'tokyo-shotengai').kind, 'neon', 'oden sign beats the noren');
+  assert.equal(L.classifyTap(610, 400, 'tokyo-shotengai').kind, 'neon', 'oden sign beats the noren');
   // Osaka lamps: the lamp centre (848,200) sits inside the window-glow
   // sign box, so it sparks the sign; the tap circle's edge (960,200)
   // is outside the box and swings the lamp.
@@ -454,9 +520,9 @@ test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
   const lamp = L.classifyTap(960, 200, 'osaka-cafe');
   assert.equal(lamp.kind, 'lantern'); assert.equal(lamp.which, 0);
   // Matcha paper lantern swings; the garden stone lantern is a sign.
-  const ml = L.classifyTap(234, 244, 'kyoto-matcha');
+  const ml = L.classifyTap(335, 115, 'kyoto-matcha');
   assert.equal(ml.kind, 'lantern'); assert.equal(ml.which, 0);
-  assert.equal(L.classifyTap(1520, 500, 'kyoto-matcha').kind, 'neon');
+  assert.equal(L.classifyTap(1700, 690, 'kyoto-matcha').kind, 'neon');
   // Enoden's train is a static plate, not a tap target.
   assert.equal(L.classifyTap(744, 586, 'kamakura-enoden').kind, 'none');
   // Street band fx/fy are per-scene: osaka band x 950..1900, y 680..837.
@@ -467,7 +533,7 @@ test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
   const sb = L.classifyTap(1425, 837, 'osaka-cafe');
   assert.ok(Math.abs(sb.fy - 0) < 1e-9, 'bottom of the osaka band is fy=0');
   // Yasaka's slope is the full-width street band.
-  const ys = L.classifyTap(960, 700, 'kyoto-yasaka');
+  const ys = L.classifyTap(975, 700, 'kyoto-yasaka');
   assert.equal(ys.kind, 'street');
   assert.ok(Math.abs(ys.fx - 0.5) < 1e-9);
 });

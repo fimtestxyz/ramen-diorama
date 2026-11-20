@@ -10,41 +10,41 @@
     "layer0": {
       "file": "layers/layer0-backdrop.png",
       "z": -0.36,
-      "coverage": 0.2425
+      "coverage": 0.3112
     },
     "layer1": {
       "file": "layers/layer1-pagoda.png",
       "z": -0.05,
-      "coverage": 0.06
+      "coverage": 0.0362
     },
     "layer2": {
       "file": "layers/layer2-facades.png",
       "z": 0.15,
-      "coverage": 0.3758
+      "coverage": 0.4156
     },
     "layer3": {
       "file": "layers/layer3-figure.png",
       "z": 0.2,
-      "coverage": 0.0096
+      "coverage": 0.004
     },
     "layer4": {
       "file": "layers/layer4-slope-lanterns.png",
       "z": 0.34,
-      "coverage": 0.312
+      "coverage": 0.233
     }
   },
   "masks": {
     "mask-cloth": {
       "file": "masks/mask-cloth.png",
-      "coverage": 0.3758
+      "coverage": 0.4156
     },
     "mask-dry": {
       "file": "masks/mask-dry.png",
-      "coverage": 0.1319
+      "coverage": 0.1329
     },
     "mask-emissive": {
       "file": "masks/mask-emissive.png",
-      "coverage": 0.0679
+      "coverage": 0.0784
     },
     "mask-flame": {
       "file": "masks/mask-flame.png",
@@ -52,7 +52,7 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.8681
+      "coverage": 0.8671
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",
@@ -60,33 +60,33 @@
     },
     "mask-street": {
       "file": "masks/mask-street.png",
-      "coverage": 0.2532
+      "coverage": 0.1878
     }
   },
   "anchors": {
     "counter_top_y": 650,
     "figure": [
-      1031,
-      550
+      960,
+      690
     ],
     "lantern_front_pivot": [
-      1462,
-      450
+      1470,
+      770
     ],
     "lantern_rear_pivot": [
-      656,
-      430
+      750,
+      690
     ],
     "steam_top": [
       960,
-      420
+      500
     ]
   },
   "cloth_layer": null,
   "static_file": null,
   "rest_composite": {
-    "mean_abs_diff": 0.058,
-    "p99": 1.31,
-    "max": 9.7
+    "mean_abs_diff": 0.094,
+    "p99": 2.73,
+    "max": 9.1
   }
 }

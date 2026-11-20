@@ -304,6 +304,53 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   storage → zh). `applyI18n()` also sets
   `document.documentElement.lang` (`zh-Hant` / `en` / `ja`).
 
+## Osaka drip-bug lessons (2026-11-20, found by live E2E #6)
+
+- **A render loop must never assume every scene has every feature.**
+  Osaka is the only scene with `drips: null`, so `createSim` gives it
+  `drips: []` — but `syncRainLines()` looped 16 drip segments
+  unconditionally and threw on `sim.drips[0].wait` before the first
+  frame was ever drawn, freezing the scene forever (and showing the
+  frozen pre-switch ramen frame, which looked like a wrong-scene bug).
+  The sim side already had a test (`drips.length === 0` for osaka);
+  the render side had none. Rule: whenever a scene feature is
+  nullable in the registry, the render loop that consumes it needs a
+  guard AND a smoke test pinning the guard — the sim test alone does
+  not cover the render path.
+- **A first-load failure must stay visible.** `loadScene`'s catch hid
+  `#loading` before rethrowing, so `init`'s catch wrote the failure
+  message into a hidden element and the failure looked like a black
+  screen. `init`'s catch now un-hides `#loading`. Never hide a loading
+  overlay in a catch without making sure the error it hides is shown
+  somewhere visible.
+- **A "scene loads" check must verify pixels, not chrome.** E2E #5
+  marked osaka PASS on the progress bar + toast + picker value while
+  no osaka frame was ever drawn. A scene switch only counts when the
+  rendered picture is the new scene.
+- **"Seams" can be the source art.** The matcha / shotengai / yasaka
+  strips measured identical between the layer composite and the
+  source art (mean diff ≤0.09), sit mid-layer with no layer boundary
+  on them, and are visible in crops of the source art itself (pillars,
+  sign edges, dark gaps, rails). Re-slicing, feathering, and renderer
+  changes cannot remove them — only source-art work (accept, inpaint +
+  re-slice, or regenerate) can. Before blaming the slicer, composite
+  the layers and diff against the source at the exact reported
+  coordinates.
+- **The user's rule: a shipped coordinate mistake gets a lint.**
+  The registry (`index.html`) and the slicer config
+  (`scripts/scenes.json` anchors) are two copies of the same geometry
+  — they drifted twice (v1 matcha steam src 94px above the bowl; v2
+  registry still pointing at v1 art). `test/logic.test.mjs` now has a
+  lint test pinning the registry to the anchors (steam src/top,
+  lantern pivot, rig-from-eyes, cloth panels = punch polys). It guards
+  drift, not measurement: the anchors themselves are verified by
+  viewing the art, per the regen checklist in spec.md.
+- **Tap mapping must match the strip build.** `classifyTap` divided
+  the noren rod uniformly, but `buildNorenStrips` builds strips per
+  panel — with unequal panels a tap brushed a strip ~1 away from the
+  finger. Both now map per panel; a test case pins the discriminating
+  tap (300,400) → strip 5.
+
 ## Push rules (repo-wide, learned 2026-11-18)
 
 - **Update the build stamp on every index.html push.** The title

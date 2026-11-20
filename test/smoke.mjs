@@ -165,6 +165,20 @@ test('structure: cloth-static is fetched and built only for cloth scenes; textur
   assert.ok(!html.includes('}, undefined, reject);'), 'no bare reject passthrough remains in loadTexture');
 });
 
+test('structure: drip loop tolerates drip-less scenes; first-load failure stays visible', () => {
+  // 2026-11-20 E2E #6: osaka-cafe (the only scene with drips: null) froze
+  // forever — syncRainLines looped 16 times unconditionally and threw on
+  // sim.drips[0].wait before the first frame was ever drawn. The loop
+  // must park missing drips off-screen instead of dereferencing them.
+  assert.ok(html.includes('if (!d) { dp[i * 6] = 0;'),
+    'drip loop guards missing drips (osaka has none)');
+  // Same incident, secondary find: loadScene hides #loading in its catch
+  // before rethrowing, so init's failure message was written into a
+  // hidden element and a first-load failure looked like a black screen.
+  assert.ok(html.includes("$('loading').classList.remove('hidden');"),
+    'init failure re-shows the loading overlay so the message is visible');
+});
+
 test('structure: build stamp is present in the title block', () => {
   // 2026-11-20: a stale pre-fix page on a phone is indistinguishable
   // from the current build without it. The stamp is a build timestamp

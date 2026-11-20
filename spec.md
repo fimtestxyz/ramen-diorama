@@ -895,3 +895,312 @@ where alpha is ~0).
 - The cloth scenes (ramen, shotengai) still render the strips
   correctly — the static variants were regenerated from the
   re-sliced layers.
+
+## Osaka drip bug + seams verdict (2026-11-20, found by E2E #6 — fix local, not yet pushed)
+
+### E2E #6 result (2026-11-20 19:38–19:45, head ac40092): NOT SHIPPABLE
+
+- Build stamp correct (19:28). Ramen seams PASS at rest and full parallax.
+- Osaka-cafe: switch shows the ramen scene again + a pale tan block;
+  cold start with osaka as the remembered scene = black canvas 40+ s,
+  no loading text, no toast, fps "—". Switching back to ramen recovers.
+- Matcha / shotengai / yasaka: the reported strips are STILL visible.
+  Enoden mostly clean, only a thin left-edge artifact.
+- Regressions all PASS (language, music panel, presets).
+
+### Osaka root cause: a render-loop bug, not deployment, layers, or slicing
+
+`syncRainLines()` looped 16 drip segments unconditionally
+(`const d = sim.drips[i]; const on = d.wait <= 0;`). Osaka is the ONLY
+scene with `drips: null` in the registry, so `createSim` gives it
+`drips: []` — `sim.drips[0]` is `undefined` and the first animation
+frame throws a TypeError. `syncRainLines()` is the first call in
+`syncScene()`, which runs before rendering, so no osaka frame was ever
+drawn; `requestAnimationFrame(loop)` is scheduled first, so every frame
+throws identically and the picture freezes forever. That explains every
+symptom: the "osaka" view is the frozen pre-switch ramen frame (the tan
+block is the frozen ramen street overlay's edge); cold start loads fine
+then throws before the first draw, and the fps meter update sits after
+`syncScene`, so it never runs. Deployed osaka manifest/PNGs/index.html
+are byte-identical to local (sha256 checked); local osaka art is a real
+kissaten. CORRECTION: E2E #5's "osaka PASS" was a false pass — the same
+unguarded loop was in 759a447; the check trusted the progress bar +
+toast + picker value without verifying the pixels.
+
+Fix (code only, 1 place): the drip loop parks a missing drip off-screen
+(`if (!d) { ...; continue; }`). `stepSim` was already correct (loops on
+`sim.drips.length`); only the render side assumed 16 drips always exist.
+
+Secondary fix (same incident): a first-load failure was invisible —
+`loadScene`'s catch hides `#loading` before rethrowing, and `init`'s
+catch wrote the failure message into the now-hidden `#loadmsg`, leaving
+only a toast that disappears in seconds. `init`'s catch now un-hides
+`#loading` so the message stays on screen.
+
+### Seams verdict: the remaining strips are IN the source art, not seams
+
+Measured on the deployed PNGs: layer composite vs source art at every
+reported strip differs by mean 0.00–0.09, max ≤8.3; NO layer boundary
+(alpha 0.5 crossing) falls on any strip; every strip sits mid-layer
+(matcha x447–510 = lattice-window wooden pillar + shelf edge in layer4;
+shotengai x573–607 = wall corner beside the おでん sign in layer3;
+yasaka x393–420 = dark gap beside the stone lantern in layer4; left-edge
+banding = real horizontal rails / sea wall). The 12px feather works
+(local minified test 0.00% was correct). No re-slice, feather, or
+renderer change can remove these — only source-art-level work: (1) accept
+them as scene content, (2) inpaint/edit the strips in source-art and
+re-run depth + slice for the 3 affected scenes, or (3) regenerate the 3
+images. Decision pending with the user.
+
+### Tests after this fix
+
+- New smoke test: drip loop guards missing drips + init failure
+  re-shows the loading overlay. (Logic test already asserted
+  `createSim` gives osaka `drips.length === 0` — the sim side was never
+  the problem; the render side had no test until now.)
+
+### Live E2E still to check for this fix (do NOT close it without this)
+
+- Switch to osaka: the kissaten renders (barista + customer + 喫茶ライオン
+  neon), parallax works; reload with osaka remembered draws within 10 s,
+  no black screen; fps meter moves; osaka → ramen → osaka round trip.
+- No regression on the other five scenes.
+
+## Source-art regeneration (2026-11-20, local only — not yet pushed or live-verified)
+
+User decision 2026-11-20 19:59 (option 3 in the seams verdict): regenerate
+the three source images whose strips were in the art itself — kyoto-matcha,
+tokyo-shotengai, kyoto-yasaka. The other three scenes (ramen, osaka-cafe,
+kamakura-enoden) were NOT touched. Raw generations + old source arts are
+kept under `assets/scenes/_raw/` (provenance, NEVER pushed).
+
+### New art (all 16:9, viewed at full size, no retry needed)
+
+- **kyoto-matcha v2** (was 1920×1280, centre-cropped y+100 → 1920×1080):
+  woman in a purple floral kimono whisking matcha at a low black table,
+  big paper 茶 lantern upper-left, shelves with pottery/bonsai left,
+  garden with stone lanterns + maple right. Old strips gone: the shelves
+  have thin even frames (no thick dark pillar at x447–510), the garden's
+  left edge is the shoji frame, no grey strip at x1145–1175. Column-mean
+  profile at the old strip zones shows no sustained wide dip (sharpest
+  1px steps are real object edges: shelf frame 44, shoji edge 36).
+- **tokyo-shotengai v2** (was 2240×1120, centre x-crop → 1920×1080):
+  izakaya with 居酒屋 noren, 酒 lanterns, もつ煮・やきとり sign, red
+  おでん sign flush on an unbroken wood wall, steaming pot, cat
+  bottom-right. Old strip gone: the wall beside the おでん sign is
+  continuous warm wood planking, no grey gap at x573–607 (the 65-step at
+  x568 is the oden sign's own edge). All Japanese text reads correctly.
+- **kyoto-yasaka v2** (was 1920×1280, centre-cropped y+100 → 1920×1080):
+  five-storey pagoda centre, red-umbrella figure walking away down a wet
+  slope, stone lanterns both sides. Old strips gone: no dark gap beside
+  the stone lantern at x393–420, no left-edge banding (profile max|dev|
+  9, sharpest step 5 across x0–70).
+
+### Depth (Depth Anything V2 Small, same weights as Phase 1, sha256 fcf51f1b…)
+
+- matcha: range 0.063–7.396, mean 1.779. Garden [1250,100,1850,700] mean
+  12.9 (<60 PASS). Table check had to move: the old rect
+  [800,800,1300,1000] measured 132.3 (<140) because it included the dark
+  wall behind the woman's arm — new rect [900,950,1450,1060] (table +
+  bowl + kettle) measures 173.0 (>140 PASS).
+- shotengai: range 0.000–5.827, mean 2.652. Near street
+  [100,900,1800,1060] mean 145.5 (>100 PASS). Sky check had to move: the
+  old rect [900,50,1250,400] measured 49.4 (>40) because it caught the
+  bright 酒 lanterns and lit signs — new rect [1250,450,1450,650]
+  (far street) measures 13.3 (<40 PASS), check renamed "far street is far".
+- yasaka: range 0.000–5.480, mean 2.390. Slope [500,800,1400,1050] mean
+  144.9 (>120 PASS); sky [600,0,1300,150] mean 0.6 (<40 PASS) — both old
+  checks still fit, unchanged.
+
+### Re-slice (12px feather, 15px inpaint, same bars as Phase 1)
+
+All three: layer coverages sum to 1.000; rest composite mean < 0.15,
+p99 < 12.
+
+| scene | rest mean | rest p99 | coverages L0/L1/L2/L3/L4 |
+|---|---|---|---|
+| kyoto-matcha | 0.067 | 1.44 | 0.614 / 0.015 / 0.132 / 0.028 / 0.211 |
+| tokyo-shotengai | 0.046 | 1.20 | 0.126 / 0.058 / 0.242 / 0.370 / 0.204 |
+| kyoto-yasaka | 0.094 | 2.73 | 0.311 / 0.036 / 0.416 / 0.004 / 0.233 |
+
+Geometry was re-measured from 100px-grid overlays and all three configs
+in `scripts/scenes.json` rewritten (anchors, layers, masks, inpaint,
+depth_checks; shotengai punch polys = the 3 noren panels, test point
+[200,500]). Two real defects found while re-tuning, both fixed locally:
+
+- **Yasaka figure swallowed by the slope plate.** In the new composition
+  the figure stands ON the slope (y 620–750), inside layer4's slope
+  polygon — first slice left layer3-figure at 0.001 (umbrella tip only).
+  Fix: the slope polygon is notched around the figure
+  (x 920–1010, y 650–760); `mask-street` keeps the full wedge. After the
+  fix layer3 = 0.004 and the figure plate shows the umbrella + person
+  cleanly isolated.
+- **Shotengai depth_assist must not touch the noren.** layer4's assist
+  rect was narrowed to x ≥ 950 ([950,700,1920,1080], thr 130) so the
+  noren (x 0–620) cannot be split across layer3/layer4.
+
+Layer plates viewed after slicing: matcha woman+table clean (head
+ellipse, body rect, table, kettle); shotengai izakaya whole with the
+noren unsplit; yasaka figure isolated. Known minor over-coverage, same
+pattern as Phase 1: matcha's body rect and head ellipse carry small
+chunks of shelf/shoji with the woman, and the depth_assist grabs a
+patch of pond onto layer4 — invisible at rest, a ≤12px fringe at most
+during parallax.
+
+### Tests after this change
+
+- JS: 61/61 pass (`node --test test/*.test.mjs test/smoke.mjs`).
+- `python3 test/slices.test.py`: all passed. `python3 test/scenes.test.py`:
+  all passed. `node --check` on both index.html script blocks: OK
+  (block 0 is the importmap JSON, skipped). index.html was NOT touched.
+
+### Files changed (local only, nothing pushed or uploaded)
+
+- `scripts/scenes.json` (3 scene configs rewritten).
+- Per scene (×3): `source-art.png`, `depth.png`, `manifest.json`,
+  `layers/` (5 plates; shotengai also `layer3-static.png`), `masks/`
+  (7 masks). Total 46 scene files + `scripts/scenes.json` + `spec.md` =
+  48, plus 9 new files under `_raw/` = 57 files changed/created.
+- `assets/scenes/_raw/`: 3 new v2 generation files + 3 metadata jsons,
+  3 `old-<scene>-source-art.png` backups (provenance, never push).
+- `spec.md` (this record).
+- NOT touched: `index.html` (osaka drip fix intact), ramen, osaka-cafe,
+  kamakura-enoden.
+
+### Open before push / live E2E (do NOT close without these)
+
+- **The `SCENES` registry geometry in index.html still holds the OLD
+  art's values** (matcha lantern [234,244] → [335,115], eyes, bowl,
+  steam; shotengai noren panels, pot, cat; yasaka figure, lanterns).
+  The registry must be updated to the new coordinates (see the configs
+  in `scripts/scenes.json`) before the new art goes live, or lantern
+  pivots, steam, eyes and the figure anchor will point at the wrong
+  places. This task was forbidden to touch index.html — update it in a
+  follow-up, then push the new art + registry together with the osaka
+  drip fix.
+- Live E2E after push: at rest in each of the 3 scenes, no hard vertical
+  strips at the old locations; parallax clean; cloth (shotengai noren)
+  still renders; no regression on the other three scenes.
+
+### Registry update for the v2 art (2026-11-20, local only, nothing pushed)
+
+`SCENES` in `index.html` now matches the v2 art (measured from the new
+source-art.png files + the v2 `scripts/scenes.json` anchors; nothing
+copied from the old registry). Derivation rules, all verified against
+the v1 scenes: street = mask-street bbox; mist = street-band centre as
+frame fractions; drips x-range = street x-range as fractions, landY
+just above the street top; rig pivot = eye midpoint x, eye y + 1.2× eye
+separation; lantern body/rx/ry from the slicer's fitted ellipse
+(cross-checked against the layer PNG alpha bbox); signs measured from
+the art (wooden board and oden sign tightened by crop reading).
+
+- **kyoto-matcha:** rig pivot [773,450] → [959,559]; lantern pivot
+  [234,0] → [335,0], body [234,244] → [335,115], rx 110 → 155, ry
+  140 → 118, taps [[234,244,130]] → [[335,115,140]]; signs
+  [[1417,399,1622,602]] → [[1625,625,1775,775]] (nearest stone
+  lantern); steam src [900,731] → [1075,925], top [900,560] →
+  [1075,700], mist [0.76,0.72] → [0.81,0.82]; street
+  {1200,700,1737,863} → {1200,700,1920,1080}; drips x0/x1
+  0.62/0.90 → 0.62/1.0 (y0 0.05, landY 0.62 kept). hair false,
+  sigma 0.00018 kept.
+- **tokyo-shotengai:** cloth panels → {0,135,290,810,830},
+  {135,340,300,800,800}, {340,620,330,700,780} (from punch_polys);
+  signs (5) → [[0,0,620,290] board, [595,310,720,670] oden,
+  [1430,325,1490,430] white vertical far sign, [1510,360,1680,470]
+  beige horizontal sign, [1290,450,1345,540] yellow vertical far
+  sign]; steam src [580,700] → [750,830], top [580,420] →
+  [750,620], mist [0.52,0.82] → [0.62,0.82]; street
+  {501,700,1499,1079} → {450,700,1920,1080}; drips x0/x1
+  0.26/0.78 → 0.23/1.0 (landY 0.62 kept). lanterns [] kept.
+- **kyoto-yasaka:** signs (4) → [[900,120,1020,440] pagoda lit
+  windows, [100,130,320,345] left shop windows, [1610,130,1820,340]
+  right shop windows, [1420,780,1530,920] front-right stone lantern];
+  steam src [960,670] → [960,690], top [960,420] → [960,500], mist
+  [0.50,0.80] → [0.51,0.80]; street {301,650,1619,1079} →
+  {150,650,1800,1080}; drips x0/x1 0.16/0.84 → 0.08/0.94 (landY
+  0.57 kept). lanterns [] kept, rig null kept.
+
+Test change: `test/logic.test.mjs` classifyTap points moved to the
+new geometry (same intent): shotengai (20,400)→strip 0, (310,400)→
+strip 4, (515,500)→strip 7, (610,400)→neon; matcha (335,115)→lantern,
+(1700,690)→neon; yasaka (975,700)→street fx 0.5. The strip points
+follow classifyTap's uniform-across-the-rod-span mapping (see note
+below), not the per-panel visual strip centres.
+
+Tests after this change: JS 61/61 pass; `test/slices.test.py` pass;
+`test/scenes.test.py` pass; `node --check` on both index.html script
+blocks OK. Osaka drip fix untouched (guard + init re-show verified
+present); ramen, osaka-cafe, kamakura-enoden entries untouched.
+
+Known follow-up (not fixed here — it is a classifyTap logic change,
+not a registry value): the tap-to-strip mapping assumes uniform
+strips across the whole rod span, but the v2 shotengai panels are
+unequal (135 / 205 / 280 wide), so a tap can brush a strip ~1 strip
+away from the finger (v1 panels were near-equal, so the mapping was
+approximately right). Fix would be per-panel mapping in classifyTap.
+
+### Old-art check: the OLD matcha registry vs the OLD art
+
+Live still runs the old art + old registry for kyoto-matcha. Checked
+every old registry number against the backup
+`assets/scenes/_raw/old-kyoto-matcha-source-art.png` (annotated crops):
+
+- **Steam src [900,731] — WRONG, biggest mismatch.** The matcha bowl
+  is at x 830–1000, y 775–875, centre ≈ (915,825). The registry src
+  sits 94px above the bowl centre, in the steam wisp above the rim.
+  The steam plane therefore spans y 560–731 and never reaches the
+  bowl (rim 775): the animated steam floats above the bowl, and
+  tapping the bowl itself gives 'none' instead of 'steam' (tap rect
+  ends at y 731). Correct value: src ≈ (915,825). Top [900,560]
+  is correct (the painted wisp fades ~y 550).
+- **Lantern — WRONG (body/radius/pivot).** The lantern spans
+  x 127–297, y 150–360, centre (212,255), half-extents (85,105).
+  Registry body [234,244] rx 110 ry 140 draws an ellipse
+  x 124–344, y 104–384: 22px too far right, rx +25, ry +35 — the
+  glow spills ~47px past the lantern's right edge and ~46px above
+  its top onto the wall, and the swing pivot [234,0] is 22px right
+  of the true hang point (~212, where the cords meet). Correct:
+  pivot ≈ [212,0], body ≈ [212,255], rx ≈ 85, ry ≈ 105.
+- **Rig pivot [773,450] — small error.** Eyes ≈ [743,428] and
+  [778,433] (3/4 view, separation 35) → pivot should be
+  ≈ [760,472] (eye midpoint x, eye y + 1.2× separation). Registry
+  is ~13px right and ~22px high (near the cheek, not the neck).
+- **Street x1 1737 — slightly short.** The wet stepping-stone path
+  visibly extends to x ≈ 1800 at y 750–860; the rect cuts off ~60px
+  on the right (taps there give 'none' instead of 'street').
+- **Signs [[1417,399,1622,602]] — OK, loose but functional.** The
+  stone lantern (roof x 1500–1620, y 440–600) sits inside the rect;
+  tapping it hits the sign.
+- **Drips {0.62,0.90,0.05,0.62} — OK.** Matches the street x-range
+  pattern, lands just above the path.
+
+Most likely live issue: the steam floating above the bowl (and the
+bowl not responding to taps), with the lantern glow/pivot
+misalignment as the second candidate. Both are fixed by the v2 art +
+the registry update above — no separate fix to the old values is
+needed if the new art + registry are pushed together. If the old art
+ever has to stay live, the minimal old-registry fix is steam src →
+(915,825) and lantern pivot/body/rx/ry → (212,0)/(212,255)/85/105.
+
+## Registry lint + per-panel noren taps (2026-11-20, local only — not yet pushed)
+
+User's rule (2026-11-20, after the matcha live issue): when a coordinate
+mistake ships, add a check that catches it.
+
+- **Lint test** (`test/logic.test.mjs`, "registry geometry matches the
+  scene anchors"): for every scene in `scripts/scenes.json`, the
+  `index.html` registry must agree with the anchors — steam top exact,
+  steam src exact on the named bowl/cup centre (else same x as the top,
+  below it), swinging-lantern pivot x exact with y = 0, rig pivot from
+  the eyes (midpoint x, eye y + 1.2x eye separation, ±5px), cloth
+  panels equal to the slicer's punch polygons. The two files may not
+  drift. It does NOT verify the anchors themselves — a number can be
+  consistently wrong in both files; anchors are verified by viewing
+  the art (regen checklist).
+- **Per-panel noren taps**: `classifyTap` mapped taps uniformly across
+  the whole noren rod, but `buildNorenStrips` builds strips per panel
+  (3 per panel). With unequal v2 shotengai panels (135 / 205 / 280)
+  a tap could brush a strip ~1 away from the finger. `classifyTap`
+  now maps per panel; test case (310,400) moved strip 4 → 5, with a
+  discriminating case (300,400) → 5 (uniform mapping would say 4).
+- Tests after this change: JS 62/62, both Python suites pass.
