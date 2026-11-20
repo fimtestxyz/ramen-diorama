@@ -116,18 +116,18 @@ test('smoke: pure-sim frame budget (60 sim-seconds must run fast)', () => {
   assert.ok(ms < 3000, `3600 fixed steps took ${ms.toFixed(0)}ms (budget 3000ms)`);
 });
 
-test('structure: every scene manifest asset exists on disk (all 6 scenes)', () => {
+test('structure: every scene manifest asset exists on disk (all 7 scenes)', () => {
   // Phase 2: paths are manifest-driven, so index.html no longer lists
   // them literally. What is pinned instead: every file every manifest
-  // names exists, the registry lists all 6 scenes, and the app builds
+  // names exists, the registry lists all 7 scenes, and the app builds
   // texture URLs from the manifest it fetched.
   const scenes = L.SCENES;
-  assert.equal(scenes.length, 6, 'registry has 6 scenes');
+  assert.equal(scenes.length, 7, 'registry has 7 scenes');
   // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
   // Array prototype differs from this file's, so deepStrictEqual fails
   // on identical contents.)
   assert.equal(scenes.map((s) => s.id).join(','),
-    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka');
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku');
   for (const def of scenes) {
     const m = JSON.parse(readFileSync(path.join(root, def.dir, 'manifest.json'), 'utf8'));
     const check = L.validateManifest(m);
@@ -177,6 +177,35 @@ test('structure: drip loop tolerates drip-less scenes; first-load failure stays 
   // hidden element and a first-load failure looked like a black screen.
   assert.ok(html.includes("$('loading').classList.remove('hidden');"),
     'init failure re-shows the loading overlay so the message is visible');
+});
+
+test('structure: steam-less scenes do not crash the builders; snow is registry-driven; cold-start title is set before load', () => {
+  // 2026-11-20 hakodate-goryokaku: the first scene with no steaming
+  // object (steam: null), no swinging lanterns, no rig, no drips.
+  // Every consumer of def.steam must guard for it:
+  assert.ok(html.includes('if (!st) return;'), 'buildSteamMist returns early without steam');
+  assert.ok(html.includes('if (def.steam) {'), 'classifyTap only tests the steam rect when the scene has steam');
+  assert.ok(html.includes('const bowlUV = st'), 'buildPost defaults the brightening centre for steam-less scenes');
+  // Snowfall is registry-driven: one Points draw call, built and synced
+  // with the rain lines, disposed with the graph, and only the scene
+  // with snow: true has flakes (createSim guards the count).
+  assert.ok(html.includes('function buildSnowLines()'), 'snow builder exists');
+  assert.ok(html.includes('function syncSnowLines()'), 'snow sync exists');
+  assert.ok(html.includes('buildSnowLines();'), 'loadScene builds the snow');
+  assert.ok(html.includes('syncSnowLines();'), 'syncScene syncs the snow');
+  assert.ok(html.includes('snowLines = null;'), 'dispose clears the snow reference');
+  assert.ok(html.includes('snow: def.snow ? makeSnow(SNOW_COUNT, rng) : []'), 'flakes only for snow scenes');
+  assert.ok(html.includes("snow: true"), 'hakodate has snow: true in the registry');
+  // Cold-start title (E2E #7 diagnosis): the hardcoded <h1> said
+  // 深夜拉麵 until updateSceneChrome ran after the scene loaded, so a
+  // remembered non-ramen scene flashed the wrong title for ~5-10 s.
+  // init must set the title from the saved scene BEFORE the first load.
+  assert.ok(html.includes('const firstDef = L.sceneById(firstId);'), 'init reads the saved scene first');
+  assert.ok(html.includes("$('scene-title').innerHTML = firstDef.title"), 'init sets the title from the saved scene');
+  assert.ok(html.indexOf('firstDef.title') < html.indexOf('await loadScene(firstId);'),
+    'title is set before the first scene loads');
+  assert.ok(html.includes("applyMood(firstDef.snow ? 'snow' : 'drizzle');"),
+    'a snow scene opens in its snow-night preset, not drizzle');
 });
 
 test('structure: build stamp is present in the title block', () => {
@@ -411,13 +440,15 @@ test('phase 2: layer toggle maps to the mesh that holds the layer (layer3 findin
 
 test('phase 2: scene picker exists, switches scenes, persists the choice', () => {
   assert.ok(html.includes('id="sel-scene"'), 'picker exists');
-  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka']) {
+  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka', 'hakodate-goryokaku']) {
     assert.ok(html.includes(`value="${id}"`), `picker lists ${id}`);
   }
   assert.ok(html.includes('async function loadScene(id)'), 'loadScene exists');
   assert.ok(html.includes('async function switchScene(id)'), 'switchScene exists');
   assert.ok(html.includes('localStorage.setItem(SCENE_STORAGE_KEY, def.id)'), 'choice is persisted');
-  assert.ok(html.includes('await loadScene(savedSceneId())'), 'first load uses the saved scene');
+  // The first load uses the saved scene — via firstId, so init can set
+  // the title from the same saved scene before loading (title fix).
+  assert.ok(html.includes('await loadScene(firstId);'), 'first load uses the saved scene');
   assert.ok(html.includes("const SCENE_STORAGE_KEY = 'ramen-diorama.scene'"), 'storage key is stable');
   // Lazy loading: no scene assets are preloaded — only the selected
   // scene's manifest + files are fetched, on demand.
@@ -469,7 +500,7 @@ test('i18n: scene picker options are re-rendered from the translated scene names
   assert.ok(html.includes('function renderSceneOptions()'), 'renderSceneOptions exists');
   assert.ok(html.includes('L.sceneName(def.id, lang)'), 'picker text comes from sceneName');
   assert.ok(html.includes("(def.emoji ? def.emoji + ' ' : '')"), 'picker keeps the emoji prefix');
-  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka']) {
+  for (const id of ['ramen', 'osaka-cafe', 'kyoto-matcha', 'kamakura-enoden', 'tokyo-shotengai', 'kyoto-yasaka', 'hakodate-goryokaku']) {
     assert.ok(html.includes(`value="${id}"`), `picker still lists ${id}`);
   }
 });

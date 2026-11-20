@@ -188,7 +188,7 @@
 
 <div id="title" class="hud glass">
   <h1 id="scene-title">深夜ラーメン <span>· 2.5D</span></h1>
-  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-20 20:56</span></p>
+  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-21 00:02</span></p>
 </div>
 
 <div id="topbtns" class="hud">
@@ -199,6 +199,7 @@
     <option value="kamakura-enoden">🚃 鎌倉江之電</option>
     <option value="tokyo-shotengai">🏮 東京下町商店街</option>
     <option value="kyoto-yasaka">🗼 京都八坂塔</option>
+    <option value="hakodate-goryokaku">❄️ 函館五稜郭雪夜</option>
   </select>
   <select class="btn" id="sel-lang" data-i18n-title="app.langTitle" title="語言">
     <option value="zh" selected>中文</option>
@@ -222,6 +223,7 @@
   <button class="btn" data-mood="typhoon" data-i18n="mood.typhoon">🌀 颱風</button>
   <button class="btn" data-mood="3am" data-i18n="mood.3am">🌙 凌晨三點</button>
   <button class="btn" data-mood="steam" data-i18n="mood.steam">♨ 蒸汽</button>
+  <button class="btn" data-mood="snow" data-i18n="mood.snow">❄ 雪夜</button>
 </div>
 
 <div id="panel" class="hud glass">
@@ -303,12 +305,18 @@
     { id: 'layer4', file: 'layers/layer4-woman-counter.png', z: 0.34 }
   ];
   var MOODS = {
-    drizzle: { rain: 0.45, wind: 0.35, flicker: 0.5, steam: 0.5, parallax: 0.8, lightning: 0 },
-    typhoon: { rain: 1.0, wind: 1.0, flicker: 0.9, steam: 0.3, parallax: 1.0, lightning: 1 },
-    '3am':   { rain: 0.25, wind: 0.15, flicker: 0.35, steam: 0.7, parallax: 0.6, lightning: 0 },
-    steam:   { rain: 0.15, wind: 0.1, flicker: 0.4, steam: 1.0, parallax: 0.7, lightning: 0 }
+    drizzle: { rain: 0.45, wind: 0.35, flicker: 0.5, steam: 0.5, parallax: 0.8, lightning: 0, snow: 0 },
+    typhoon: { rain: 1.0, wind: 1.0, flicker: 0.9, steam: 0.3, parallax: 1.0, lightning: 1, snow: 0 },
+    '3am':   { rain: 0.25, wind: 0.15, flicker: 0.35, steam: 0.7, parallax: 0.6, lightning: 0, snow: 0 },
+    steam:   { rain: 0.15, wind: 0.1, flicker: 0.4, steam: 1.0, parallax: 0.7, lightning: 0, snow: 0 },
+    /* Snow night (hakodate-goryokaku, 2026-11-20): no rain, calm wind,
+       dim neon, low steam. snow: 1 turns the snowfall on; it only
+       renders on scenes with snow: true in the registry. snow is a
+       preset param like lightning, NOT a slider — readSliders must
+       preserve it across slider moves (see the app script). */
+    snow:    { rain: 0, wind: 0.2, flicker: 0.3, steam: 0.2, parallax: 0.8, lightning: 0, snow: 1 }
   };
-  /* Scene registry (Phase 2, 2026-11-20): the ramen shop plus the five
+  /* Scene registry (Phase 2, 2026-11-20): the ramen shop plus the six
      scenes built in Phase 1. All geometry is measured from the shipped
      assets, not assumed:
      - street: the mask-street bounding box (frame px), i.e. where rain
@@ -321,7 +329,14 @@
      - cloth panels: ramen from slice.py (NOREN_LEFT/RIGHT), shotengai
        from scripts/scenes.json punch_polys.
      - drips: null where drips make no sense (osaka is an interior —
-       no rain drips inside a cafe).
+       no rain drips inside a cafe). Hakodate has drips: null too —
+       it snows there, it does not rain; snowfall is a separate
+       system (snow: true) driven by the snow preset param.
+     - steam: null where the scene has no steaming object (hakodate);
+       every consumer of def.steam must guard for it (see buildSteamMist,
+       buildPost, classifyTap) — a missing steam must never throw.
+     - snow: true only on hakodate-goryokaku; the other scenes are
+       false, never undefined, so the flag reads the same everywhere.
      The ramen entry reproduces the old hardcoded constants exactly:
      street {0,700,691.2,1080} (= x 0..0.36, y 700..1080), drips
      x 0.05..0.33, landY 0.62, signs = the old TAP_SIGNS, noren =
@@ -341,7 +356,8 @@
               [430, 560, 500, 740], [1500, 120, 1830, 230]],
       steam: { src: [1505, 885], top: [1520, 560], width: 0.16, z: 0.34, mist: [0.22, 0.72], second: [0.60, 0.55] },
       street: { x0: 0, y0: 700, x1: 691.2, y1: 1080 },
-      drips: { x0: 0.05, x1: 0.33, y0: 0.09, landY: 0.62 } },
+      drips: { x0: 0.05, x1: 0.33, y0: 0.09, landY: 0.62 },
+      snow: false },
     { id: 'osaka-cafe', name: '大阪喫茶店', title: '大阪喫茶店', dir: 'assets/scenes/osaka-cafe',
       emoji: '☕', names: { zh: '大阪喫茶店', en: 'Osaka Kissaten', ja: '大阪喫茶店' },
       taxi: false,
@@ -353,7 +369,8 @@
       signs: [[1310, 120, 1720, 310], [631, 99, 954, 387], [114, 28, 225, 179], [980, 175, 1165, 245]],
       steam: { src: [1547, 675], top: [1547, 580], width: 0.10, z: 0.34, mist: [0.74, 0.70] },
       street: { x0: 950, y0: 680, x1: 1900, y1: 837 },
-      drips: null },
+      drips: null,
+      snow: false },
     { id: 'kyoto-matcha', name: '京都町家抹茶屋', title: '京都町家抹茶屋', dir: 'assets/scenes/kyoto-matcha',
       emoji: '🍵', names: { zh: '京都町家抹茶屋', en: 'Kyoto Machiya Tea House', ja: '京都町家抹茶屋' },
       taxi: false,
@@ -364,7 +381,8 @@
       signs: [[1625, 625, 1775, 775]],
       steam: { src: [1075, 925], top: [1075, 700], width: 0.16, z: 0.34, mist: [0.81, 0.82] },
       street: { x0: 1200, y0: 700, x1: 1920, y1: 1080 },
-      drips: { x0: 0.62, x1: 1.0, y0: 0.05, landY: 0.62 } },
+      drips: { x0: 0.62, x1: 1.0, y0: 0.05, landY: 0.62 },
+      snow: false },
     { id: 'kamakura-enoden', name: '鎌倉江之電', title: '鎌倉江之電', dir: 'assets/scenes/kamakura-enoden',
       emoji: '🚃', names: { zh: '鎌倉江之電', en: 'Kamakura Enoden', ja: '鎌倉江ノ電' },
       taxi: false,
@@ -375,7 +393,8 @@
               [331, 382, 382, 682], [1400, 300, 1500, 320]],
       steam: { src: [400, 500], top: [400, 400], width: 0.12, z: 0.20, mist: [0.77, 0.82] },
       street: { x0: 1050, y0: 701, x1: 1919, y1: 1079 },
-      drips: { x0: 0.55, x1: 1.0, y0: 0.05, landY: 0.62 } },
+      drips: { x0: 0.55, x1: 1.0, y0: 0.05, landY: 0.62 },
+      snow: false },
     { id: 'tokyo-shotengai', name: '東京下町商店街', title: '東京下町商店街', dir: 'assets/scenes/tokyo-shotengai',
       emoji: '🏮', names: { zh: '東京下町商店街', en: 'Tokyo Shitamachi Street', ja: '東京下町商店街' },
       taxi: false,
@@ -389,7 +408,8 @@
               [1510, 360, 1680, 470], [1290, 450, 1345, 540]],
       steam: { src: [750, 830], top: [750, 620], width: 0.16, z: 0.34, mist: [0.62, 0.82] },
       street: { x0: 450, y0: 700, x1: 1920, y1: 1080 },
-      drips: { x0: 0.23, x1: 1.0, y0: 0.05, landY: 0.62 } },
+      drips: { x0: 0.23, x1: 1.0, y0: 0.05, landY: 0.62 },
+      snow: false },
     { id: 'kyoto-yasaka', name: '京都八坂塔', title: '京都八坂塔', dir: 'assets/scenes/kyoto-yasaka',
       emoji: '🗼', names: { zh: '京都八坂塔', en: 'Kyoto Yasaka Pagoda', ja: '京都八坂の塔' },
       taxi: false,
@@ -399,7 +419,25 @@
       signs: [[900, 120, 1020, 440], [100, 130, 320, 345], [1610, 130, 1820, 340], [1420, 780, 1530, 920]],
       steam: { src: [960, 690], top: [960, 500], width: 0.12, z: 0.34, mist: [0.51, 0.80] },
       street: { x0: 150, y0: 650, x1: 1800, y1: 1080 },
-      drips: { x0: 0.08, x1: 0.94, y0: 0.05, landY: 0.57 } },
+      drips: { x0: 0.08, x1: 0.94, y0: 0.05, landY: 0.57 },
+      snow: false },
+    { id: 'hakodate-goryokaku', name: '函館五稜郭雪夜', title: '函館五稜郭雪夜', dir: 'assets/scenes/hakodate-goryokaku',
+      emoji: '❄️', names: { zh: '函館五稜郭雪夜', en: 'Hakodate Goryokaku Snow', ja: '函館五稜郭' },
+      taxi: false,
+      rig: null,
+      cloth: null,
+      lanterns: [],
+      /* Signs: the four lit buildings, measured from the emissive-mask
+         blobs (office 859–971 x 314–386, pavilion 772–834 x 332–374,
+         annex 664–756 x 394–446, mid building 1016–1118 x 429–491),
+         padded ~15 px as tap targets. The anchor centre sits inside
+         its rect (pinned by the registry lint test). */
+      signs: [[850, 300, 985, 400], [758, 318, 848, 388],
+              [650, 380, 770, 460], [1002, 415, 1132, 505]],
+      steam: null,
+      street: { x0: 0, y0: 760, x1: 1920, y1: 1080 },
+      drips: null,
+      snow: true },
   ];
   function sceneById(id) {
     for (var i = 0; i < SCENES.length; i++) if (SCENES[i].id === id) return SCENES[i];
@@ -611,6 +649,51 @@
     return splashes;
   }
 
+  /* ---- snow ---- */
+  var SNOW_COUNT = 250;
+  function makeSnow(count, rng) {
+    // Flakes drift down slowly and sway side to side; the wind slider
+    // adds a steady sideways drift on top. x/y are frame fractions
+    // (top-origin, like rain); size is the flake diameter in world
+    // units at the flake plane (z = 0.3): 0.010-0.028 ≈ 6-16 px at
+    // 1080p (gl_PointSize = size * height * 2.5 / 4.7). Only the scene
+    // with snow: true in the registry gets flakes.
+    var flakes = [];
+    for (var i = 0; i < count; i++) {
+      flakes.push({
+        x: rng(), y: rng(),
+        size: 0.010 + rng() * 0.018,
+        speed: 0.03 + rng() * 0.06,          // UV units per second (rain is 0.55-1.0)
+        phase: rng() * 2 * Math.PI,
+        swayAmp: 0.010 + rng() * 0.020,      // sideways sway, UV units per second
+        swayFreq: 0.5 + rng() * 1.0          // sway cycles per second
+      });
+    }
+    return flakes;
+  }
+  /* Step the snow one fixed step. active flakes fall and sway; inactive
+     ones (i >= active) are frozen in place — the render parks them
+     off-screen. A flake that falls below the frame or drifts off the
+     sides respawns at the top. t is sim time (seconds), so the sway
+     stays deterministic for a given seed + step count. */
+  function stepSnow(flakes, active, dt, wind, t, rng) {
+    for (var i = 0; i < flakes.length; i++) {
+      var f = flakes[i];
+      if (i >= active) { continue; }
+      f.y += f.speed * dt;
+      f.x += (wind * 0.08 + f.swayAmp * Math.sin(t * f.swayFreq + f.phase)) * dt;
+      if (f.y > 1.02 || f.x < -0.05 || f.x > 1.05) {
+        f.y = -0.02 - rng() * 0.05;
+        f.x = rng();
+        f.speed = 0.03 + rng() * 0.06;
+        f.size = 0.010 + rng() * 0.018;
+        f.phase = rng() * 2 * Math.PI;
+        f.swayAmp = 0.010 + rng() * 0.020;
+        f.swayFreq = 0.5 + rng() * 1.0;
+      }
+    }
+  }
+
   function nextEventDelay(rng, kind) {
     return kind === 'taxi' ? 22 + rng() * 18 : 28 + rng() * 30;
   }
@@ -639,6 +722,7 @@
       noren: Array.from({ length: norenCount }, function () { return { d: 0, v: 0 }; }),
       water: { n: waterN, h: new Float32Array(waterN * waterN), v: new Float32Array(waterN * waterN), max: 0 },
       rain: makeRain(600, rng, def.street),
+      snow: def.snow ? makeSnow(SNOW_COUNT, rng) : [],
       drips: dripGeo ? Array.from({ length: 16 }, function () {
         return { x: dripGeo.x0 + rng() * (dripGeo.x1 - dripGeo.x0),
                  y: dripGeo.y0 + rng() * 0.4, v: 0, wait: rng() * 2 };
@@ -707,6 +791,13 @@
       var sp = sim.splashes[s];
       waterImpulse(sim.water.h, sim.water.n, sp.x, sp.y, sp.amp * 0.6, 0.05);
     }
+
+    /* snowfall: only scenes with snow: true have flakes (sim.snow is
+       empty elsewhere, so this is a no-op for them). The active count
+       follows the snow preset param (1 = full fall, 0 = none); the
+       wind slider sets the sideways drift. Flakes do not splash —
+       they land on snow and vanish. */
+    stepSnow(sim.snow, Math.floor(SNOW_COUNT * (p.snow || 0)), dt, p.wind, sim.t, rng);
 
     /* awning drips: gravity, splash on the street. Per-scene band
        (sim.geo.drips); scenes without one (osaka, an interior) have
@@ -853,8 +944,11 @@
         if (Math.hypot(px - tp[0], py - tp[1]) < tp[2]) return { kind: 'lantern', which: li };
       }
     }
-    var sr = steamRect(def.steam);
-    if (px >= sr.x0 && px <= sr.x1 && py >= sr.y0 && py <= sr.y1) return { kind: 'steam' };
+    var sr = null;
+    if (def.steam) {
+      sr = steamRect(def.steam);
+      if (px >= sr.x0 && px <= sr.x1 && py >= sr.y0 && py <= sr.y1) return { kind: 'steam' };
+    }
     var st = def.street;
     if (px >= st.x0 && px <= st.x1 && py >= st.y0 && py <= st.y1) {
       return { kind: 'street',
@@ -993,7 +1087,7 @@
       'quality.autoTo': '畫質：自動 → {tier} {scale}×',
       'quality.tierHigh': '高', 'quality.tierMid': '中', 'quality.tierLow': '低',
       'mood.drizzle': '🌧 毛毛雨', 'mood.typhoon': '🌀 颱風',
-      'mood.3am': '🌙 凌晨三點', 'mood.steam': '♨ 蒸汽',
+      'mood.3am': '🌙 凌晨三點', 'mood.steam': '♨ 蒸汽', 'mood.snow': '❄ 雪夜',
       'panel.title': '氣氛 ATMOSPHERE',
       'slider.rain': '雨勢 Rain', 'slider.wind': '風 Wind',
       'slider.flicker': '霓虹閃爍 Neon', 'slider.steam': '蒸汽 Steam',
@@ -1061,7 +1155,7 @@
       'quality.autoTo': 'Quality: Auto → {tier} {scale}×',
       'quality.tierHigh': 'High', 'quality.tierMid': 'Medium', 'quality.tierLow': 'Low',
       'mood.drizzle': '🌧 Drizzle', 'mood.typhoon': '🌀 Typhoon',
-      'mood.3am': '🌙 3AM', 'mood.steam': '♨ Steam',
+      'mood.3am': '🌙 3AM', 'mood.steam': '♨ Steam', 'mood.snow': '❄ Snow Night',
       'panel.title': 'ATMOSPHERE',
       'slider.rain': 'Rain', 'slider.wind': 'Wind',
       'slider.flicker': 'Neon flicker', 'slider.steam': 'Steam',
@@ -1129,7 +1223,7 @@
       'quality.autoTo': '画質：自動 → {tier} {scale}×',
       'quality.tierHigh': '高', 'quality.tierMid': '中', 'quality.tierLow': '低',
       'mood.drizzle': '🌧 小雨', 'mood.typhoon': '🌀 台風',
-      'mood.3am': '🌙 午前3時', 'mood.steam': '♨ 蒸気',
+      'mood.3am': '🌙 午前3時', 'mood.steam': '♨ 蒸気', 'mood.snow': '❄ 雪の夜',
       'panel.title': '雰囲気 ATMOSPHERE',
       'slider.rain': '雨', 'slider.wind': '風',
       'slider.flicker': 'ネオンの明滅', 'slider.steam': '蒸気',
@@ -1225,6 +1319,7 @@
     addRing: addRing, addSwirl: addSwirl,
     waterStep: waterStep, waterImpulse: waterImpulse,
     blinkAmountAt: blinkAmountAt, makeRain: makeRain, stepRain: stepRain,
+    SNOW_COUNT: SNOW_COUNT, makeSnow: makeSnow, stepSnow: stepSnow,
     nextEventDelay: nextEventDelay,
     createSim: createSim, stepSim: stepSim, advance: advance,
     applyImpulseLantern: applyImpulseLantern, applyBrushNoren: applyBrushNoren,
@@ -1402,7 +1497,7 @@ let norenStrips = [];   // 6 strip meshes
 let lanternGroups = []; // [rear, front]
 let water = null;       // { targetA, targetB, updateMat, ... } or CPU fallback
 let emissiveMat = null, streetMat = null, postMat = null, postScene = null, postCam = null;
-let rainLines = null, dripLines = null, steamMats = [], steamMeshes = [], mistMat = null, mistMesh = null;
+let rainLines = null, dripLines = null, snowLines = null, steamMats = [], steamMeshes = [], mistMat = null, mistMesh = null;
 let taxiGroup = null, flashQuad = null;
 let textures = {};
 
@@ -2216,9 +2311,87 @@ function syncRainLines() {
   dripLines.geometry.attributes.aUv2.needsUpdate = true;
 }
 
+/* ---------- snowfall (hakodate-goryokaku only) ---------- */
+function buildSnowLines() {
+  // One THREE.Points draw call, 250 flakes max — far cheaper than the
+  // 600-segment rain lines. A soft round sprite per flake: the shader
+  // draws a white core with a faint dark rim, so a flake reads against
+  // the dark sky (white core) AND against the bright snow ground
+  // (dark rim + motion). No mask: snow falls over the whole frame,
+  // including the sky — the rain mask would clip exactly the region
+  // where snow is most visible. Like rain, the flakes are full-frame
+  // weather and are never shifted by parallax.
+  const count = L.SNOW_COUNT;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  g.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(count), 1));
+  const m = new THREE.ShaderMaterial({
+    uniforms: {
+      uScale: { value: 2700 }, // drawing-buffer height / (2 * tan(fov/2)); refreshed per frame
+      uOpacity: { value: 0.9 },
+    },
+    vertexShader: /* glsl */`
+      attribute float aSize;
+      uniform float uScale;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform float uOpacity;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float d = length(c) * 2.0;
+        float core = smoothstep(0.6, 0.15, d);
+        float rim = smoothstep(1.0, 0.55, d) * (1.0 - core);
+        vec3 col = mix(vec3(0.10, 0.13, 0.20), vec3(0.93, 0.97, 1.0), core);
+        float a = max(core * 0.85, rim * 0.22) * uOpacity;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(col, a);
+      }
+    `,
+    transparent: true, depthWrite: false,
+  });
+  const points = new THREE.Points(g, m);
+  points.frustumCulled = false;
+  points.renderOrder = 6;
+  scene.add(points);
+  snowLines = points;
+}
+function syncSnowLines() {
+  // Parked off-screen when inactive, exactly like the rain lines:
+  // the sim holds no flakes at all on non-snow scenes (sim.snow is
+  // []), so this loop is a no-op there apart from the uniform refresh.
+  const sim = state.sim, p = sim.params;
+  const active = Math.floor(L.SNOW_COUNT * (p.snow || 0));
+  // uScale = drawing-buffer height / (2 * tan(fov/2)); tan(fov/2) is
+  // (PLANE_H/2)/CAM_D = 0.2, so the factor is height * 2.5. Refreshed
+  // every frame so a resize or a quality-tier change cannot stale it.
+  snowLines.material.uniforms.uScale.value = renderer.domElement.height * 2.5;
+  const pos = snowLines.geometry.attributes.position.array;
+  const sizes = snowLines.geometry.attributes.aSize.array;
+  for (let i = 0; i < L.SNOW_COUNT; i++) {
+    const f = sim.snow[i];
+    const on = f && i < active;
+    pos[i * 3] = on ? (f.x - 0.5) * L.PLANE_W : 0;
+    pos[i * 3 + 1] = on ? (0.5 - f.y) * L.PLANE_H : -10;
+    pos[i * 3 + 2] = 0.3;
+    sizes[i] = on ? f.size : 0;
+  }
+  snowLines.geometry.attributes.position.needsUpdate = true;
+  snowLines.geometry.attributes.aSize.needsUpdate = true;
+}
+
 /* ---------- steam + mist ---------- */
 function buildSteamMist() {
   const st = sceneDef.steam;
+  // Steam-less scenes (hakodate-goryokaku: no steaming object, no mist
+  // anchor) have nothing to build — the snow is the atmosphere there.
+  // Guard here, not in loadScene: steamMats/steamMeshes stay empty and
+  // mistMat/mistMesh stay null, and syncScene already tolerates both.
+  if (!st) return;
   const s = L.plateScale(st.z);
   const mkSteam = (wFrac, hFrac, cxU, cyV) => {
     const w = L.PLANE_W * wFrac * s, h = L.PLANE_H * hFrac * s;
@@ -2320,8 +2493,13 @@ function buildPost() {
   // The post pass brightens the steam directly above the steam source
   // (bowl on ramen/matcha, cup on osaka, oden pot on shotengai):
   // the centre is the scene's steam source, from the registry.
+  // Steam-less scenes (hakodate): centre the brightening on the frame
+  // centre instead — the heat amount is small there anyway (snow
+  // preset steam 0.2), so the choice is barely visible.
   const st = sceneDef.steam;
-  const bowlUV = new THREE.Vector2(st.src[0] / 1920, 1 - st.src[1] / 1080);
+  const bowlUV = st
+    ? new THREE.Vector2(st.src[0] / 1920, 1 - st.src[1] / 1080)
+    : new THREE.Vector2(0.5, 0.5);
   postMat = new THREE.ShaderMaterial({
     uniforms: {
       uTex: { value: postRT.texture },
@@ -2636,6 +2814,9 @@ function readSliders() {
   const p = {};
   for (const k of sliders) p[k] = parseFloat($('s-' + k).value);
   p.lightning = state.sim.params.lightning;
+  // snow and lightning are preset params, not sliders: a slider move
+  // must not silently turn the snowfall off (same rule as lightning).
+  p.snow = state.sim.params.snow || 0;
   return p;
 }
 function applyMood(name) {
@@ -3068,6 +3249,7 @@ const pendingImpulses = []; // tap splashes, consumed by the next frame's water 
 function syncScene() {
   const sim = state.sim, p = sim.params;
   syncRainLines();
+  syncSnowLines();
   // Parallax scale for this viewport aspect (round 1): at 16:9 it is 1
   // (full spec amplitude); on wider viewports the fixed 1.18 overscan
   // cannot cover full deflection, so the shift is scaled down just
@@ -3405,7 +3587,7 @@ function disposeSceneGraph() {
   textures = {};
   plates = {}; norenStrips = []; lanternGroups = [];
   steamMats = []; steamMeshes = []; mistMat = null; mistMesh = null;
-  streetMat = null; emissiveMat = null; rainLines = null; dripLines = null;
+  streetMat = null; emissiveMat = null; rainLines = null; dripLines = null; snowLines = null;
   taxiGroup = null; flashQuad = null;
 }
 /* Layer toggles, rebuilt per scene (the layers differ per scene:
@@ -3485,6 +3667,7 @@ async function loadScene(id) {
     buildStreet();
     buildEmissive();
     buildRainLines();
+    buildSnowLines();
     buildSteamMist();
     buildTaxi();
     buildPost();
@@ -3545,7 +3728,17 @@ async function init() {
     // First scene: the saved one (localStorage), ramen by default.
     // loadScene owns the loading overlay, the texture fetch, the graph
     // build, and the inspector toggles.
-    await loadScene(savedSceneId());
+    // Cold-start title: the hardcoded <h1> says 深夜拉麵 until
+    // updateSceneChrome runs after the scene loads (~5-10 s), so a
+    // remembered non-ramen scene flashes the wrong title. Set it from
+    // the saved scene now, synchronously, before the first load — the
+    // title is the scene's own name (like a painting's title), so it is
+    // not translated here; applyI18n leaves it alone too.
+    const firstId = savedSceneId();
+    const firstDef = L.sceneById(firstId);
+    $('scene-title').innerHTML = firstDef.title + ' <span>· 2.5D</span>';
+    document.title = firstDef.title + ' · 2.5D Diorama';
+    await loadScene(firstId);
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -3555,7 +3748,10 @@ async function init() {
       postMat.uniforms.uRes.value.set(w, h);
     });
     bindHUD();
-    applyMood('drizzle');
+    // Default mood: drizzle everywhere, except a snow scene, which
+    // opens in its snow-night preset — a cold start on hakodate with
+    // rain falling over the snow would contradict the scene.
+    applyMood(firstDef.snow ? 'snow' : 'drizzle');
     requestAnimationFrame(loop);
     setTimeout(() => toast(tr('toast.welcome')), 600);
   } catch (err) {

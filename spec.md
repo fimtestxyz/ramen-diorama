@@ -94,7 +94,12 @@
    strictly inside the street mask.
 4. **Rain & drips.** Depth-occluded slanted alley rain (7°–15°), sparse
    organic awning drips with gravity acceleration, locked to puddle
-   splashes. Zero rain inside the stall (dry indoor mask).
+   splashes. Zero rain inside the stall (dry indoor mask). **Snowfall
+   (hakodate-goryokaku only, 2026-11-20):** 250 soft round flakes, slow
+   fall + sinusoidal sway, wind slider adds sideways drift; visible
+   against dark sky and bright snow ground (white core, faint dark
+   rim); one THREE.Points draw call; snow is a preset param, not a
+   slider (see feature 11).
 5. **Noren curtains.** Six independent cloth panels, pinned at top rod
    tabs, travelling wind ripples, organic billow, per-panel spring
    deflection when brushed by the cursor. No tearing.
@@ -113,7 +118,12 @@
 10. **Optics & post.** SRGBColorSpace + NoToneMapping (color-true anime
     pipeline), single-pass post with stove thermal heat-haze, draggable
     Before/After split-compare curtain (original JPEG vs live 3D).
-11. **Mood presets.** Drizzle, Typhoon, 3AM, Steam — one click each.
+11. **Mood presets.** Drizzle, Typhoon, 3AM, Steam, Snow Night — one
+    click each. Snow Night (rain 0, wind 0.2, flicker 0.3, steam 0.2,
+    parallax 0.8, snow 1) turns the snowfall on; it works on all
+    scenes, but snow only renders where the scene has it
+    (hakodate-goryokaku). `snow` is a preset param like `lightning`,
+    not a slider — readSliders preserves it across slider moves.
 12. **Procedural spatial Web Audio + lo-fi playlist.** Ambience is
     synthesised live, zero audio files: rain/downpour, pitched awning
     drips, broth pot simmer, 120 Hz neon buzz + spark crackle, thunder,
@@ -157,7 +167,7 @@
       the stall; puddle reflections never leak outside the street mask.
 - [ ] All tactile interactions respond: brush curtains, spark neon,
       splash puddles, swirl steam, drag compare curtain.
-- [ ] All four mood presets change the scene; all five sliders work;
+- [ ] All five mood presets change the scene; all five sliders work;
       inspector shows all six modes and all seven layer toggles.
 - [ ] Audio: every named sound synthesises live; the playlist plays
       the 6 real tracks with in-app CC BY 4.0 attribution (the only
@@ -1204,3 +1214,249 @@ mistake ships, add a check that catches it.
   now maps per panel; test case (310,400) moved strip 4 → 5, with a
   discriminating case (300,400) → 5 (uniform mapping would say 4).
 - Tests after this change: JS 62/62, both Python suites pass.
+
+## Hakodate Goryokaku snow scene — Phase 1 (2026-11-20, local only — not yet pushed)
+
+User chose Goryokaku over Hachiman-zaka / Kanemori warehouses (2026-11-20 21:07).
+7th scene: Goryokaku star fort, Hakodate, Hokkaido, in snow at dusk.
+Phase 1 = art + depth + slice only. Phase 2 (registry entry, snow particle
+system, snow preset) is a separate step; index.html untouched.
+
+- **Art**: generated 1920x1280, cropped y offset 100 to 1920x1080 (same
+  convention as the ramen source art). Elevated oblique view from
+  Goryokaku Tower: five-pointed star moat reads clearly, Magistrate's
+  Office (white walls, dark roof, warm lit windows) at centre (915,350),
+  snow-covered pine branches with cones bottom-left foreground, city
+  lights + snow mountains + dusky blue sky behind. Light snow specks
+  only (falling snow is a runtime effect, not painted in). No text
+  anywhere — nothing to garble. Raw webp + metadata in
+  assets/scenes/_raw/ (provenance, never push).
+- **Depth** (V2 Small, Python onnxruntime, 1.8s, range 0–7.585): a smooth
+  ground-plane gradient, as expected for an aerial view — sky 0, city
+  4.4, far tree line 13, office 19, fort mid 32–36, near bastion 71,
+  near snow ground 103, foreground pines 175. Manual shapes carry the
+  layering; depth assists only cut bands (layer4 thr 120 pines,
+  layer3 thr 45, layer2 thr 22).
+- **Layers** (coverages sum 1.0000): layer0 backdrop 0.2581, layer1
+  far fort 0.1214, layer2 mid fort + office 0.2023, layer3 near fort +
+  big pine 0.2268, layer4 foreground pines + near snow 0.1914.
+  Rest composite mean 0.008, p99 0.16 — best of any scene (the smooth
+  snow backdrop blends almost exactly under the feathered edges).
+- **Inpaint lesson**: the first slice used blend 0.2 with a patch
+  sampled from the bridge/moat area; wood_texture mirrors the patch
+  into chevrons across layer0. This aerial scene has no large
+  featureless snow patch (every candidate carries a bridge/moat
+  diagonal or tree line), so the config sets blend 0.0 — pure Laplace
+  fill. Snow is smooth; the Laplace base alone is the correct
+  backdrop. (If a later scene needs texture, the patch must contain
+  no strong linear feature.)
+- **Masks**: cloth = layer2 (no cloth), dry = pine-branch shelter
+  (0.216), emissive = 4 lit buildings (office, pavilion, annex,
+  mid building; 0.008), flame = same 4 points, rain = snowfall area
+  (depth_rect below 150, 0.701), steam = EMPTY (no steaming object in
+  this scene — coverage 0.0), street = near snow ground band
+  (0.269).
+- **Anchors** (for the Phase-2 registry): office_center [915,350],
+  pavilion [803,353], annex [710,420], mid_building [1067,460],
+  big_pine [1370,690], bridge [1040,540], street_band
+  [0,760,1920,1080]. NO steam anchors and NO lantern pivots — this
+  scene has no steaming object and no swinging lantern; Phase 2 must
+  handle a steam-less, lantern-less scene (registry steam field and
+  the lint test already tolerate a missing steam_top anchor).
+  No person with visible eyes → rig null.
+- **Tests**: scenes.test.py pass (count updated 5 → 6 scenes),
+  slices.test.py pass, JS 62/62 pass. Fragment model: high/mid
+  19.2M vs 48.6M (40%), low 12.2M (25%) — plain (non-rig) scene.
+- **Files**: 9.7 MB total (source-art 4.1 MB, depth 0.2 MB, layers
+  5.4 MB, masks ~0.05 MB). NOT pushed; nothing uploaded.
+- **Caveat for Phase 2 / E2E**: E2E #7 (same evening) found NEW
+  blurred vertical strips at new positions in the three regenerated
+  scenes — cause still under diagnosis (source art / slicing / 0.5x
+  rendering). Hakodate uses the same 12px-feather pipeline; if the
+  cause turns out to be pipeline-related rather than source-art
+  content, this scene may need the same fix.
+
+## Hakodate Goryokaku snow scene — Phase 2 (2026-11-20, local only — not yet pushed)
+
+Wires the Phase-1 scene into the app + snowfall + snow-night preset +
+cold-start title fix. index.html, tests and docs only — no art,
+manifest or config touched. NOT pushed; nothing uploaded.
+
+- **Registry entry** (`hakodate-goryokaku`): names {zh 函館五稜郭雪夜,
+  en Hakodate Goryokaku Snow, ja 函館五稜郭}, emoji ❄️, dir
+  `assets/scenes/hakodate-goryokaku`, taxi false, rig null, cloth
+  null, lanterns [], steam null, drips null, snow true. Signs: one
+  rect per lit building, measured from the emissive-mask blobs
+  (office 859–971 × 314–386, pavilion 772–834 × 332–374, annex
+  664–756 × 394–446, mid building 1016–1118 × 429–491), padded
+  ~15 px as tap targets: office [850,300,985,400], pavilion
+  [758,318,848,388], annex [650,380,770,460], mid building
+  [1002,415,1132,505]. The anchor centre sits inside its rect
+  (pinned by the registry lint test). Street = the near snow ground
+  band [0,760,1920,1080] (from the street_band anchor = mask-street
+  bbox). Every scene's `snow` flag is now explicit (true/false,
+  never undefined) — pinned in the registry test.
+- **Steam-less support**: the registry entry has no steam source.
+  Every consumer guards: `buildSteamMist` returns early when
+  `!sceneDef.steam` (no steam plane, no mist plane — the snow is the
+  atmosphere); `buildPost` centres the heat brightening on the frame
+  centre instead of the bowl; `classifyTap` only tests the steam rect
+  when `def.steam` exists, so a steam-less scene has no steam tap
+  target; `handleDrag`'s swirl is guarded upstream by classifyTap's
+  kind. `createSim` never referenced def.steam; `sim.steamPhase` is
+  just a timer. Empty `lanterns[]` and `rig: null` were already
+  tolerated (buildLanterns loops an empty array; buildLayer4 checks
+  `sceneDef.rig`; syncScene's lantern loop and mist guard are no-ops).
+  Ramen and the other five scenes behave exactly as before.
+- **Snowfall system** (same shape as the rain system: sim state +
+  render sync): `makeSnow(SNOW_COUNT=250, rng)` creates flakes
+  (x/y frame fractions, size 0.010–0.028 world ≈ 6–16 px at 1080p,
+  fall speed 0.03–0.09 UV/s, sinusoidal sway amp 0.010–0.030,
+  freq 0.5–1.5 Hz); `stepSnow` advances the active flakes
+  (fall + sway + wind drift 0.08 × wind per second), respawns
+  fallen/off-frame flakes at the top; inactive flakes (index ≥
+  active count) are frozen. `createSim` gives flakes only to
+  `def.snow` scenes (others get `[]`); `stepSim` steps them with the
+  active count = floor(250 × params.snow). Render: one
+  `THREE.Points` (250 max), soft round sprite per flake — white core
+  (0.85 alpha) with a faint dark rim (0.22) so a flake reads against
+  the dark sky AND the bright snow ground; no mask (snow falls over
+  the whole frame including the sky); never shifted by parallax
+  (full-frame weather, like rain); inactive flakes parked at y=-10.
+  `uScale` = drawing-buffer height × 2.5, refreshed every frame so a
+  resize or quality-tier change cannot stale it. Cost: one draw call
+  + 250 points — far cheaper than the 600-segment rain lines; the
+  quality-tier system applies unchanged (render scale shrinks the
+  point size with the buffer, which is the correct behaviour).
+  Tapping the snow ground stays the existing street interaction.
+- **Snow-night preset** (5th): rain 0, wind 0.2, flicker 0.3, steam
+  0.2, parallax 0.8, lightning 0, snow 1. i18n keys `mood.snow`:
+  zh ❄ 雪夜, en ❄ Snow Night, ja ❄ 雪の夜. `snow` is a preset param
+  like `lightning`, not a slider — `readSliders` preserves it across
+  slider moves, and `loadScene` preserves `params` across scene
+  switches (so the snow preset survives a switch to hakodate, and
+  switching away just leaves an empty snow array). Works on all
+  scenes: on non-snow scenes it only sets the weather params.
+  Cold start on a snow scene opens in the snow-night preset instead
+  of drizzle — rain falling over the snow would contradict the scene.
+- **Cold-start title fix** (from the E2E #7 diagnosis): `init` now
+  reads the saved scene id once (`firstId`), sets `#scene-title` and
+  `document.title` from it synchronously BEFORE the first
+  `loadScene(firstId)` — the hardcoded ramen `<h1>` no longer
+  flashes for ~5–10 s on a remembered non-ramen scene. The title is
+  the scene's own name (like a painting's title), so it is not
+  translated. Residual caveat: a paint between HTML parse and the
+  end-of-body app script could still show the hardcoded title for one
+  frame — not observed, and the 5–10 s flash is what this closes.
+  No change to the "flash of ramen layers" (the diagnosis showed no
+  ramen layers are drawn before load).
+- **Tests after this phase**: JS 65/65 (was 62; +2 snow logic tests,
+  +1 smoke structural test), slices.test.py pass, scenes.test.py
+  pass, both script blocks node --check OK. Updated: moods test
+  (five presets, snow param), registry test (7 scenes + hakodate
+  fields + snow flag explicit), lint test (no steam_top anchor ⇒
+  no steam in the registry; lit-building anchors inside sign rects),
+  steamPlaneRect (skips steam-less scenes), classifyTap (hakodate
+  signs/street/no-steam), createSim (hakodate snow 250, others 0),
+  i18n names + mood.snow keys, smoke manifest/picker tests (7
+  scenes), new smoke test pinning the steam guards, the snow wiring,
+  and the title fix (title set before first load).
+- **Live E2E still to check for this phase (do NOT close it without this)**:
+  - [ ] hakodate renders (star fort, office, pines, city lights) and
+        the snow falls visibly against sky AND snow ground.
+  - [ ] snow preset on/off, wind slider visibly changes the drift.
+  - [ ] cold start with hakodate remembered: title is 函館五稜郭雪夜
+        from the first paint; no rain falls.
+  - [ ] tapping each lit building sparks it; tapping the snow ground
+        splashes (street interaction); no steam tap target anywhere.
+  - [ ] regression: the other six scenes unchanged (ramen steam,
+        osaka interior, matcha lantern, shotengai noren).
+  - [ ] fps on the snow scene (250 points should be negligible).
+- **Push plan (when approved)**: text files via the App (index.html,
+  test/logic.test.mjs, test/smoke.mjs, spec.md, CLAUDE.md — with a
+  fresh build stamp at push time, per the push rules) + 14 hakodate
+  PNGs via browser upload (root 2, layers 5, masks 7). Do NOT push
+  `assets/scenes/_raw/` (provenance only).
+
+## Targeted source-art strip edits (2026-11-20, local only — not yet pushed)
+
+User decision 2026-11-20 23:47 (option 2 in the strip-diagnosis #2
+verdict): edit ONLY the five strip spots in the source art, then
+re-run depth + slice for the affected scenes — no regeneration.
+Method (all four scenes): dark-pixel-only luminance lift toward a
+per-row neighbour reference (bright pixels — text, lantern glow, lit
+windows — are untouched by construction), inside a feathered mask,
+capped so no region can be lifted past its neighbours (max_lift
+30–55). Backups of the pre-edit art are in `assets/scenes/_raw/` as
+`old-<scene>-source-art-v2.png` (osaka: `old-osaka-cafe-source-art.png`,
+its art is Phase 1, no v2 exists). Depth re-run with V2 Small
+(model re-downloaded after a VM restart wiped /tmp, sha256
+`fcf51f1b…`), then `scripts/slice_scene.py --scene <slug>` per scene.
+Feather 12px / inpaint 15px unchanged. `index.html` untouched — no
+anchor moved (all edits are luminance-only, no object moved).
+
+### Per-strip results (full-height column-mean dip, old → new)
+
+- **kyoto-matcha x1130–1170** (shoji frame post): the post was already
+  garden-toned (~70 vs garden ~75); the strip was the HARD LEFT EDGE
+  (shoji 150 → post 61 in one column). Fix: texture-preserving
+  luminance ramp across x1100–1145 (per-row profile replaced by a
+  smoothstep interpolation, pixels scaled by the profile ratio so
+  wood grain survives) + gentle lift of the post core toward the
+  garden tone. Cliff step 79 → ~21 max; dip +31.1 → +28.8 (the dip
+  metric barely moves because the post must stay darker than the
+  bright shoji — the cliff step is the honest metric here). **First
+  attempt used a horizontal Gaussian blur for the edge and created a
+  soft blurry column — a new artifact, same class as the complaint.
+  Reverted from backup and redid with the ramp. Lesson in CLAUDE.md:
+  never blur source art to fix a strip.**
+- **tokyo-shotengai x0–120** (left edge): post-only edit, noren panel
+  untouched per the constraint (panel band +12.1 → +11.9, unchanged).
+  Top sign sliver x0–52 lifted (dip +34.5 → +28.7; the residual is
+  the も text strokes, which must stay dark). Door post x0–108,
+  y845–1080 lifted toward the counter tone, handle rect excluded
+  (dip +51.4 → +23.7). Full-height dip +27.2 → +19.2.
+- **kyoto-yasaka x1180–1225** (building corner/gap): dark rows only
+  (y520–800; the lit-window rows were already brighter than their
+  neighbours and the dark-only lift skips them). Gap rows +48.8/+37.4
+  → +23/+8. Full-height dip −3.7 → −7.7 (was already ~flat).
+- **kyoto-yasaka x0–120** (left edge): wall/door/bamboo lifted toward
+  the lit-window tone, capped at +45 (dip +23.3 → +11.2). Lit lattice
+  window intact.
+- **osaka-cafe x665–735** (lamp glow column, lowest-confidence
+  verdict): conservative wall-valley lift only, y200–620 (lamp,
+  poster text, cake dome all excluded). Posters-upper dip +33.4 →
+  +22.0, posters-lower +20.1 → +11.1, full-height +5.0 → +0.9. Kept:
+  the improvement is measurable and no new light band appears in the
+  crop. Residual +22 in the upper band is the wall being darker than
+  two bright posters — genuine wall content; pushing further would
+  risk a light column.
+
+### Verification
+
+- Dips re-measured on the NEW source art AND on the composited layer
+  plates (composite dip == source dip at every strip: +28.8 / +19.1 /
+  −7.6 / +11.2 / +0.8) — what the app renders at rest is the fixed art.
+- Viewed the new source-art.png for all four scenes at full size and
+  a crop around each strip: strips visually gone, text/features near
+  them survive (matcha 茶 lantern/steam/bowl, shotengai 居酒屋 noren +
+  waves + もつ煮 text + door handle, yasaka paper/stone lanterns +
+  lit windows, osaka lamp + コーヒー100円/純喫茶 posters + cake dome),
+  no new artifact.
+- Rest composites: matcha 0.067, shotengai 0.046, yasaka 0.096, osaka
+  0.067 (all mean < 0.15); coverages sum to 1.0000 per scene
+  (matcha L4 0.211 → 0.210, yasaka L4 0.233 → 0.222 — small depth-driven
+  shifts, no boundary moved).
+- Tests: JS 65/65, `test/slices.test.py` pass, `test/scenes.test.py`
+  pass (incl. depth checks). No anchor moved, so the registry lint
+  needs no update and `index.html` stays untouched.
+
+### Files changed (local only, nothing pushed or uploaded)
+
+- Per scene (×4): `source-art.png`, `depth.png`, `manifest.json`,
+  `layers/` (5 plates; shotengai also `layer3-static.png`),
+  `masks/` (7 masks) = 61 files. Plus `assets/scenes/_raw/` backups
+  (4 files, never push) and this spec record. Pushes with the
+  Hakodate Phase 2 files in one batch (text via App, PNGs via browser
+  upload); the live E2E must re-check all five strips at rest after
+  the push.

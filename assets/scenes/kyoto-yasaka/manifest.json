@@ -10,7 +10,7 @@
     "layer0": {
       "file": "layers/layer0-backdrop.png",
       "z": -0.36,
-      "coverage": 0.3112
+      "coverage": 0.3204
     },
     "layer1": {
       "file": "layers/layer1-pagoda.png",
@@ -20,7 +20,7 @@
     "layer2": {
       "file": "layers/layer2-facades.png",
       "z": 0.15,
-      "coverage": 0.4156
+      "coverage": 0.4171
     },
     "layer3": {
       "file": "layers/layer3-figure.png",
@@ -30,13 +30,13 @@
     "layer4": {
       "file": "layers/layer4-slope-lanterns.png",
       "z": 0.34,
-      "coverage": 0.233
+      "coverage": 0.2224
     }
   },
   "masks": {
     "mask-cloth": {
       "file": "masks/mask-cloth.png",
-      "coverage": 0.4156
+      "coverage": 0.4171
     },
     "mask-dry": {
       "file": "masks/mask-dry.png",
@@ -85,8 +85,8 @@
   "cloth_layer": null,
   "static_file": null,
   "rest_composite": {
-    "mean_abs_diff": 0.094,
-    "p99": 2.73,
+    "mean_abs_diff": 0.096,
+    "p99": 2.75,
     "max": 9.1
   }
 }

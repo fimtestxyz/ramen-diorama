@@ -1,6 +1,381 @@
 {
   "notes": "Per-scene slicing config for the 5 new diorama scenes. Coordinates are in the 1920x1080 frame, measured from the generated source art. Larger depth = nearer (0-255). Layer priority (topmost wins): layer4 > layer3 > layer2 > layer1 > layer0 (backdrop). Shapes: {\"e\": [cx,cy,rx,ry]} ellipse, {\"r\": [x0,y0,x1,y1]} rect, {\"p\": [[x,y],...]} polygon. Masks mirror the ramen scene's 7 stencils; 'cloth' is the cloth element of the scene (noren/curtains/lattice), wherever it lives. 'static_file' is the cloth layer with its panels punched out (for the strip rig); null when the scene has no cloth strips.",
   "scenes": {
+    "hakodate-goryokaku": {
+      "anchors": {
+        "office_center": [
+          915,
+          350
+        ],
+        "pavilion": [
+          803,
+          353
+        ],
+        "annex": [
+          710,
+          420
+        ],
+        "mid_building": [
+          1067,
+          460
+        ],
+        "big_pine": [
+          1370,
+          690
+        ],
+        "bridge": [
+          1040,
+          540
+        ],
+        "street_band": [
+          0,
+          760,
+          1920,
+          1080
+        ]
+      },
+      "cloth_layer": null,
+      "depth_checks": [
+        {
+          "mean_gt": 130,
+          "name": "foreground pines are near",
+          "rect": [
+            0,
+            700,
+            500,
+            1080
+          ]
+        },
+        {
+          "mean_lt": 10,
+          "name": "city and sky are far",
+          "rect": [
+            0,
+            0,
+            1920,
+            250
+          ]
+        }
+      ],
+      "inpaint": {
+        "blend": 0.0,
+        "interior_rect": [
+          0,
+          200,
+          1920,
+          1080
+        ],
+        "notes": "blend 0: pure Laplace fill. This aerial scene has no large featureless patch — every snow sample carries a bridge/moat diagonal that wood_texture mirrors into chevrons (visible on layer0). Snow is smooth, so the Laplace base alone is the correct backdrop; the patch is kept only because the slicer requires it.",
+        "patch": [
+          560,
+          660,
+          850,
+          1075
+        ]
+      },
+      "layers": {
+        "layer1": {
+          "file": "layer1-far-fort.png",
+          "shapes": [
+            {
+              "r": [
+                0,
+                225,
+                1920,
+                300
+              ]
+            },
+            {
+              "r": [
+                0,
+                300,
+                1920,
+                340
+              ]
+            },
+            {
+              "p": [
+                [
+                  120,
+                  330
+                ],
+                [
+                  450,
+                  320
+                ],
+                [
+                  600,
+                  380
+                ],
+                [
+                  550,
+                  430
+                ],
+                [
+                  350,
+                  440
+                ],
+                [
+                  180,
+                  400
+                ]
+              ]
+            },
+            {
+              "p": [
+                [
+                  1200,
+                  280
+                ],
+                [
+                  1500,
+                  270
+                ],
+                [
+                  1650,
+                  330
+                ],
+                [
+                  1600,
+                  400
+                ],
+                [
+                  1400,
+                  420
+                ],
+                [
+                  1250,
+                  380
+                ]
+              ]
+            }
+          ],
+          "z": -0.05
+        },
+        "layer2": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              300,
+              1920,
+              620
+            ],
+            "threshold": 22
+          },
+          "file": "layer2-mid-fort.png",
+          "shapes": [
+            {
+              "e": [
+                915,
+                350,
+                75,
+                50
+              ]
+            },
+            {
+              "e": [
+                803,
+                353,
+                30,
+                20
+              ]
+            },
+            {
+              "r": [
+                640,
+                380,
+                780,
+                470
+              ]
+            }
+          ],
+          "z": 0.15
+        },
+        "layer3": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              550,
+              1920,
+              900
+            ],
+            "threshold": 45
+          },
+          "file": "layer3-near-fort.png",
+          "shapes": [
+            {
+              "e": [
+                1370,
+                690,
+                75,
+                145
+              ]
+            }
+          ],
+          "z": 0.2
+        },
+        "layer4": {
+          "close": 9,
+          "depth_assist": {
+            "rect": [
+              0,
+              300,
+              800,
+              1080
+            ],
+            "threshold": 120
+          },
+          "file": "layer4-foreground-pines.png",
+          "shapes": [
+            {
+              "r": [
+                0,
+                950,
+                1920,
+                1080
+              ]
+            }
+          ],
+          "z": 0.34
+        }
+      },
+      "masks": {
+        "mask-cloth": {
+          "kind": "layer",
+          "layer": "layer2"
+        },
+        "mask-dry": {
+          "kind": "poly",
+          "poly": [
+            [
+              0,
+              380
+            ],
+            [
+              650,
+              450
+            ],
+            [
+              700,
+              1080
+            ],
+            [
+              0,
+              1080
+            ]
+          ]
+        },
+        "mask-emissive": {
+          "blur": 4,
+          "kind": "shapes",
+          "shapes": [
+            {
+              "e": [
+                915,
+                350,
+                55,
+                35
+              ]
+            },
+            {
+              "e": [
+                803,
+                353,
+                30,
+                20
+              ]
+            },
+            {
+              "e": [
+                710,
+                420,
+                45,
+                25
+              ]
+            },
+            {
+              "e": [
+                1067,
+                460,
+                50,
+                30
+              ]
+            }
+          ]
+        },
+        "mask-flame": {
+          "blur": 5,
+          "kind": "points",
+          "points": [
+            [
+              915,
+              350
+            ],
+            [
+              803,
+              353
+            ],
+            [
+              710,
+              420
+            ],
+            [
+              1067,
+              460
+            ]
+          ],
+          "r": 16
+        },
+        "mask-rain": {
+          "below": 150,
+          "kind": "depth_rect",
+          "rect": [
+            0,
+            200,
+            1920,
+            1080
+          ]
+        },
+        "mask-steam": {
+          "blur": 8,
+          "kind": "shapes",
+          "shapes": []
+        },
+        "mask-street": {
+          "blur": 6,
+          "kind": "poly",
+          "poly": [
+            [
+              0,
+              820
+            ],
+            [
+              1920,
+              760
+            ],
+            [
+              1920,
+              1080
+            ],
+            [
+              0,
+              1080
+            ]
+          ]
+        }
+      },
+      "name": "Hakodate Goryokaku star fort in snow",
+      "punch_polys": null,
+      "punch_test_point": null,
+      "required_anchors": [
+        "office_center",
+        "big_pine",
+        "bridge",
+        "street_band"
+      ]
+    },
     "kamakura-enoden": {
       "anchors": {
         "counter_top_y": 800,

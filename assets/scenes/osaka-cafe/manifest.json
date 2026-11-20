@@ -52,7 +52,7 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.3558
+      "coverage": 0.3683
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",
@@ -60,7 +60,7 @@
     },
     "mask-street": {
       "file": "masks/mask-street.png",
-      "coverage": 0.0273
+      "coverage": 0.0277
     }
   },
   "anchors": {
@@ -96,7 +96,7 @@
   "static_file": null,
   "rest_composite": {
     "mean_abs_diff": 0.067,
-    "p99": 1.45,
+    "p99": 1.46,
     "max": 11.5
   }
 }

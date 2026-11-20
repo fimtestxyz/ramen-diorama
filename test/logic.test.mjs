@@ -126,15 +126,20 @@ test('rain: splashes only from the street band, normalised to the heightfield', 
   assert.ok(total > 100, `rain splashed ${total} times in 60s (was 0 before the fix)`);
 });
 
-test('moods: four presets, all sliders in range', () => {
+test('moods: five presets, all sliders in range', () => {
   const names = Object.keys(L.MOODS);
-  assert.deepEqual(names.sort(), ['3am', 'drizzle', 'steam', 'typhoon']);
+  assert.deepEqual(names.sort(), ['3am', 'drizzle', 'snow', 'steam', 'typhoon']);
   for (const m of Object.values(L.MOODS)) {
-    for (const k of ['rain', 'wind', 'flicker', 'steam', 'parallax']) {
+    for (const k of ['rain', 'wind', 'flicker', 'steam', 'parallax', 'snow']) {
       assert.ok(m[k] >= 0 && m[k] <= 1, `${k}=${m[k]} in range`);
     }
     assert.ok(m.lightning === 0 || m.lightning === 1);
   }
+  // Snow is a preset param like lightning: only the snow-night preset
+  // turns it on; the other four keep it at 0.
+  assert.equal(L.MOODS.snow.snow, 1);
+  for (const k of ['drizzle', 'typhoon', '3am', 'steam']) assert.equal(L.MOODS[k].snow, 0);
+  assert.equal(L.MOODS.snow.rain, 0, 'snow night: no rain');
 });
 
 test('sim is deterministic: same seed + same steps => identical state', () => {
@@ -395,13 +400,13 @@ test('round 2: playlist next/prev wrap around', () => {
 /* Phase 2 — multi-scene (scene switcher, per-scene anchors, cloth)    */
 /* ------------------------------------------------------------------ */
 
-test('phase 2: SCENES registry has 6 scenes; ramen reproduces the old constants', () => {
+test('phase 2: SCENES registry has 7 scenes; ramen reproduces the old constants', () => {
   const scenes = L.SCENES;
-  assert.equal(scenes.length, 6);
+  assert.equal(scenes.length, 7);
   // (join, not deepEqual: SCENES arrays come from the vm sandbox, whose
   // Array prototype differs from this file's.)
   assert.equal(scenes.map((s) => s.id).join(','),
-    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka');
+    'ramen,osaka-cafe,kyoto-matcha,kamakura-enoden,tokyo-shotengai,kyoto-yasaka,hakodate-goryokaku');
   const r = L.sceneById('ramen');
   // Ramen is the old hardcoded geometry, verbatim.
   assert.equal(r.street.x0, 0); assert.equal(r.street.y0, 700);
@@ -414,6 +419,23 @@ test('phase 2: SCENES registry has 6 scenes; ramen reproduces the old constants'
   assert.equal(r.cloth.layer, 'layer2');
   assert.equal(r.cloth.panels.length, 2);
   assert.equal(r.taxi, true);
+  // Hakodate (2026-11-20): the snow scene — no steam, no lanterns, no
+  // rig, no drips; snowfall on; four lit-building signs; the snow flag
+  // is explicit on every scene, never undefined.
+  for (const def of L.SCENES) {
+    assert.equal(typeof def.snow, 'boolean', `${def.id}: snow flag is explicit`);
+  }
+  const h = L.sceneById('hakodate-goryokaku');
+  assert.equal(h.steam, null);
+  assert.equal(h.lanterns.length, 0);
+  assert.equal(h.rig, null);
+  assert.equal(h.drips, null);
+  assert.equal(h.snow, true);
+  assert.equal(h.signs.length, 4);
+  assert.equal(h.taxi, false);
+  assert.equal(h.street.x0, 0); assert.equal(h.street.y0, 760);
+  assert.equal(h.street.x1, 1920); assert.equal(h.street.y1, 1080);
+  assert.equal(L.SCENES.filter((s) => s.snow).map((s) => s.id).join(','), 'hakodate-goryokaku');
   // Unknown id falls back to ramen.
   assert.equal(L.sceneById('nope').id, 'ramen');
   assert.equal(L.sceneById().id, 'ramen');
@@ -476,6 +498,23 @@ test('lint: registry geometry matches the scene anchors in scripts/scenes.json',
         assert.equal(p.yBot1, poly[2][1], `${id}: panel ${i} yBot1 (bottom-right)`);
       });
     }
+    // Steam-less scenes: no steam_top anchor means no steam field in
+    // the registry — the builders must not find one (hakodate, the
+    // first scene with no steaming object). A scene WITH a steam_top
+    // anchor must have a steam field (checked above).
+    if (!a.steam_top) {
+      assert.equal(def.steam, null, `${id}: no steam anchor means no steam in the registry`);
+    }
+    // Lit-building anchors must sit inside a sign rect, so tapping the
+    // building sparks it (hakodate's office, pavilion, annex and mid
+    // building — measured from the emissive-mask blobs).
+    for (const k of ['office_center', 'pavilion', 'annex', 'mid_building']) {
+      if (a[k]) {
+        const inside = (def.signs || []).some((b) =>
+          b[0] <= a[k][0] && a[k][0] <= b[2] && b[1] <= a[k][1] && a[k][1] <= b[3]);
+        assert.ok(inside, `${id}: ${k} anchor ${a[k]} sits inside a sign rect`);
+      }
+    }
   }
 });
 
@@ -489,7 +528,9 @@ test('phase 2: steamPlaneRect puts the steam above the source (ramen fix)', () =
   assert.ok(Math.abs(r.hFrac - 325 / 1080) < 1e-9, `steam height is 325 px: ${r.hFrac * 1080}`);
   assert.equal(r.wFrac, 0.16);
   // Every scene's steam plane sits between its source and its top.
+  // Steam-less scenes (hakodate) have no steam at all and are skipped.
   for (const def of L.SCENES) {
+    if (!def.steam) { assert.equal(def.id, 'hakodate-goryokaku', 'only hakodate is steam-less'); continue; }
     const p = L.steamPlaneRect(def.steam);
     const midY = (def.steam.src[1] + def.steam.top[1]) / 2;
     assert.ok(Math.abs(p.cyV * 1080 - midY) < 1e-9, `${def.id}: steam centre ${p.cyV * 1080} vs ${midY}`);
@@ -536,6 +577,18 @@ test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
   const ys = L.classifyTap(975, 700, 'kyoto-yasaka');
   assert.equal(ys.kind, 'street');
   assert.ok(Math.abs(ys.fx - 0.5) < 1e-9);
+  // Hakodate: the four lit buildings are signs (tapping one sparks it),
+  // the street band is the near snow ground, and there is NO steam
+  // target — a point that would be steam on another scene is 'none'.
+  assert.equal(L.classifyTap(915, 350, 'hakodate-goryokaku').kind, 'neon', 'office');
+  assert.equal(L.classifyTap(803, 353, 'hakodate-goryokaku').kind, 'neon', 'pavilion');
+  assert.equal(L.classifyTap(710, 420, 'hakodate-goryokaku').kind, 'neon', 'annex');
+  assert.equal(L.classifyTap(1067, 460, 'hakodate-goryokaku').kind, 'neon', 'mid building');
+  const hs = L.classifyTap(960, 900, 'hakodate-goryokaku');
+  assert.equal(hs.kind, 'street');
+  assert.ok(Math.abs(hs.fx - 0.5) < 1e-9);
+  assert.ok(Math.abs(hs.fy - (1 - 140 / 320)) < 1e-9, `hakodate street fy: ${hs.fy}`);
+  assert.equal(L.classifyTap(960, 500, 'hakodate-goryokaku').kind, 'none', 'no steam target on a steam-less scene');
 });
 
 test('phase 2: createSim per scene (noren, drips, taxi, signs, lanterns)', () => {
@@ -546,6 +599,7 @@ test('phase 2: createSim per scene (noren, drips, taxi, signs, lanterns)', () =>
     'kamakura-enoden': { noren: 0, drips: 16, taxi: false, signs: 5, lanterns: 0 },
     'tokyo-shotengai': { noren: 9, drips: 16, taxi: false, signs: 5, lanterns: 0 },
     'kyoto-yasaka': { noren: 0, drips: 16, taxi: false, signs: 4, lanterns: 0 },
+    'hakodate-goryokaku': { noren: 0, drips: 0, taxi: false, signs: 4, lanterns: 0, snow: 250 },
   };
   for (const [id, e] of Object.entries(expect)) {
     const sim = L.createSim(20261120, id);
@@ -554,6 +608,7 @@ test('phase 2: createSim per scene (noren, drips, taxi, signs, lanterns)', () =>
     assert.equal(sim.events.taxiAt === Infinity, !e.taxi, `${id}: taxi scheduled only for ramen`);
     assert.equal(sim.signs.length, e.signs, `${id}: signs`);
     assert.equal(sim.lanterns.length, e.lanterns, `${id}: lanterns`);
+    assert.equal(sim.snow.length, e.snow || 0, `${id}: snowflakes (only hakodate has any)`);
     // The sim steps without throwing for every scene (200 steps).
     for (let i = 0; i < 200; i++) L.stepSim(sim);
   }
@@ -617,6 +672,9 @@ test('i18n: default language is zh; t() returns the translated string per langua
   assert.equal(L.t('zh', 'app.subtitle'), '一張圖 · 全部在你的裝置上算出來');
   assert.equal(L.t('en', 'mood.3am'), '🌙 3AM');
   assert.equal(L.t('ja', 'mood.3am'), '🌙 午前3時');
+  assert.equal(L.t('zh', 'mood.snow'), '❄ 雪夜');
+  assert.equal(L.t('en', 'mood.snow'), '❄ Snow Night');
+  assert.equal(L.t('ja', 'mood.snow'), '❄ 雪の夜');
 });
 
 test('i18n: every key exists in all three languages, non-empty, no extras', () => {
@@ -650,6 +708,7 @@ test('i18n: scene names translate in all three languages', () => {
     'kamakura-enoden': ['鎌倉江之電', 'Kamakura Enoden', '鎌倉江ノ電'],
     'tokyo-shotengai': ['東京下町商店街', 'Tokyo Shitamachi Street', '東京下町商店街'],
     'kyoto-yasaka': ['京都八坂塔', 'Kyoto Yasaka Pagoda', '京都八坂の塔'],
+    'hakodate-goryokaku': ['函館五稜郭雪夜', 'Hakodate Goryokaku Snow', '函館五稜郭'],
   };
   for (const [id, names] of Object.entries(expected)) {
     assert.equal(L.sceneName(id, 'zh'), names[0], `${id} zh`);
@@ -682,4 +741,65 @@ test('i18n: savedLang round-trips through storage; unknown/missing value means z
   assert.equal(L.validLang('ja'), 'ja');
   assert.equal(L.validLang(''), 'zh');
   assert.equal(L.LANG_STORAGE_KEY, 'ramen-diorama.lang');
+});
+
+/* ---------- hakodate snowfall (2026-11-20) ---------- */
+
+test('snow: makeSnow ranges, stepSnow falls, wind drifts, flakes respawn', () => {
+  const rng = L.mulberry32(20261120);
+  const flakes = L.makeSnow(L.SNOW_COUNT, rng);
+  assert.equal(flakes.length, 250);
+  for (const f of flakes) {
+    assert.ok(f.x >= 0 && f.x <= 1, 'x in [0,1]');
+    assert.ok(f.y >= 0 && f.y <= 1, 'y in [0,1]');
+    assert.ok(f.size >= 0.010 && f.size <= 0.028, `size ${f.size} in [0.010,0.028]`);
+    assert.ok(f.speed >= 0.03 && f.speed <= 0.09, `speed ${f.speed} in [0.03,0.09]`);
+  }
+  // A flake falls at its own speed: 1 s at wind 0 moves it down by
+  // speed, and only by the sway sideways (swayAmp <= 0.03/s). Pin the
+  // test flakes mid-frame first, so neither respawns mid-step.
+  flakes[0].y = 0.3; flakes[0].x = 0.5;
+  const f0 = { ...flakes[0] };
+  L.stepSnow(flakes, 250, 1, 0, 0, rng);
+  assert.ok(Math.abs(flakes[0].y - (f0.y + f0.speed)) < 1e-9, 'falls at its speed');
+  assert.ok(Math.abs(flakes[0].x - f0.x) <= 0.031, 'sway only, no wind drift');
+  // Wind pushes sideways: 1 s at wind 1 adds 0.08 to x, on top of sway.
+  flakes[1].y = 0.3; flakes[1].x = 0.5;
+  const f1 = { ...flakes[1] };
+  L.stepSnow(flakes, 250, 1, 1, 0, rng);
+  assert.ok(flakes[1].x - f1.x >= 0.08 - 0.031, 'wind drifts flakes right');
+  // A flake below the frame respawns at the top; an inactive flake
+  // (index >= active) does not move at all.
+  flakes[0].y = 1.05; flakes[0].x = 0.5;
+  L.stepSnow(flakes, 250, 1 / 60, 0, 0, rng);
+  assert.ok(flakes[0].y < 0, 'fallen flake respawns above the frame');
+  assert.ok(flakes[0].x >= 0 && flakes[0].x <= 1, 'respawn x in frame');
+  const frozen = { ...flakes[249] };
+  L.stepSnow(flakes, 10, 1, 1, 0, rng);
+  assert.deepEqual({ x: flakes[249].x, y: flakes[249].y }, { x: frozen.x, y: frozen.y }, 'inactive flake is frozen');
+});
+
+test('snow: createSim wires flakes only for hakodate; stepSim runs the fall', () => {
+  for (const def of L.SCENES) {
+    const sim = L.createSim(20261120, def.id);
+    assert.equal(sim.snow.length, def.snow ? L.SNOW_COUNT : 0, `${def.id}: flakes`);
+  }
+  // Snow on: 60 steps at the snow preset move the flakes down.
+  const sim = L.createSim(20261120, 'hakodate-goryokaku');
+  sim.params = { ...L.MOODS.snow };
+  const y0 = sim.snow.map((f) => f.y);
+  for (let i = 0; i < 60; i++) L.stepSim(sim);
+  const moved = sim.snow.filter((f, i) => f.y > y0[i]).length;
+  assert.ok(moved > 200, `most flakes fell after 1s (${moved}/250)`);
+  // Snow off (drizzle): the same sim steps without moving any flake.
+  const sim2 = L.createSim(20261120, 'hakodate-goryokaku');
+  sim2.params = { ...L.MOODS.drizzle };
+  const y1 = sim2.snow.map((f) => f.y);
+  for (let i = 0; i < 60; i++) L.stepSim(sim2);
+  assert.ok(sim2.snow.every((f, i) => f.y === y1[i]), 'drizzle leaves the flakes frozen');
+  // And a non-snow scene steps fine with an empty snow array.
+  const sim3 = L.createSim(20261120, 'ramen');
+  sim3.params = { ...L.MOODS.snow };
+  for (let i = 0; i < 60; i++) L.stepSim(sim3);
+  assert.equal(sim3.snow.length, 0, 'ramen never grows flakes, even on the snow preset');
 });

@@ -10,7 +10,7 @@
     "layer0": {
       "file": "layers/layer0-backdrop.png",
       "z": -0.36,
-      "coverage": 0.6144
+      "coverage": 0.6147
     },
     "layer1": {
       "file": "layers/layer1-stone-lanterns.png",
@@ -30,7 +30,7 @@
     "layer4": {
       "file": "layers/layer4-woman-table.png",
       "z": 0.34,
-      "coverage": 0.2107
+      "coverage": 0.2103
     }
   },
   "masks": {
@@ -52,7 +52,7 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.3551
+      "coverage": 0.3544
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",
@@ -60,7 +60,7 @@
     },
     "mask-street": {
       "file": "masks/mask-street.png",
-      "coverage": 0.0885
+      "coverage": 0.1035
     }
   },
   "anchors": {
@@ -96,7 +96,7 @@
   "static_file": null,
   "rest_composite": {
     "mean_abs_diff": 0.067,
-    "p99": 1.44,
+    "p99": 1.45,
     "max": 10.9
   }
 }

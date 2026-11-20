@@ -351,6 +351,83 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   finger. Both now map per panel; a test case pins the discriminating
   tap (300,400) → strip 5.
 
+## Hakodate Phase 2 lessons (2026-11-20, first steam-less / lantern-less / rig-less scene)
+
+- **Nullable registry features: null in the registry decides, every
+  consumer guards.** Hakodate is the first scene with `steam: null`,
+  `lanterns: []`, `rig: null` and `drips: null` all at once. The
+  pattern that works: the registry states the absence explicitly
+  (`steam: null`, never a missing key), `createSim` derives empty
+  state from it (`snow: def.snow ? makeSnow(...) : []`, `drips: []`,
+  `lanterns: [].map(...)`), and each render consumer guards at its
+  own level — `buildSteamMist` returns early, `buildPost`
+  defaults the brightening centre, `classifyTap` skips the steam
+  rect, `syncScene` already tolerated empty lantern lists and a null
+  mist mesh. `handleDrag`'s steam swirl needs no guard of its own:
+  it only runs when classifyTap returns kind 'steam', which cannot
+  happen on a steam-less scene. A missing feature must never throw
+  on ANY path — sim, render, tap, post — and the smoke test pins
+  each guard by string, because the sim test alone does not cover
+  the render path (the osaka drip-bug lesson, again).
+- **A new weather system copies the rain system's shape.** Snow is
+  sim state (`makeSnow`/`stepSnow` in the logic block) + a render
+  sync (`buildSnowLines`/`syncSnowLines`, one THREE.Points), exactly
+  like rain lines + drips. Inactive flakes are parked off-screen
+  (y=-10), the same trick the rain lines use. New weather is a
+  registry flag (`snow: true` on the scene) + a preset param
+  (`snow: 1` in MOODS), NOT a slider — and `readSliders` must
+  preserve preset params across slider moves (the same rule as
+  `lightning`; a slider move that silently turns the snow off is the
+  same bug class as the one that used to clear lightning).
+- **Snow must read against both the dark sky and the bright ground.**
+  Pure-white hard dots vanish on snow. The flake shader draws a
+  white core (0.85) with a faint dark rim (0.22) — the core reads on
+  the sky, the rim + motion read on the ground. No mask: snow falls
+  over the whole frame, including the sky the rain mask would clip.
+- **Cold-start chrome must come from the saved state, not the
+  hardcoded default.** The `<h1>` said 深夜拉麵 until
+  updateSceneChrome ran after the scene loaded — a 5–10 s wrong
+  title on any remembered non-ramen scene. `init` now reads the
+  saved scene once and sets the title from it before the first
+  load. The same rule applies to any other chrome that names the
+  scene (the default mood is now scene-driven too: a snow scene
+  opens in its snow-night preset, not drizzle, because rain over
+  snow would contradict the scene).
+- **Measure sign rects from the mask, not the eye.** Hakodate's four
+  lit-building sign rects were measured from the emissive-mask blobs
+  (flood-filled bounding boxes), padded ~15 px — the anchors sit at
+  the blob centres by construction, and the lint test now asserts
+  every lit-building anchor sits inside a sign rect. Eyeballing the
+  art at display scale would have been ±50 px off.
+
+## Targeted source-art strip-edit lessons (2026-11-20, E2E #7 strips)
+
+- **Never blur source art to fix a strip.** A horizontal Gaussian
+  blur across matcha's shoji-frame cliff destroyed the wood grain
+  and lattice texture and left a soft blurry column — a new
+  artifact in exactly the class being fixed. Reverted from backup.
+  The fix that works is a texture-preserving luminance ramp: reshape
+  the row's luminance profile across the cliff (smoothstep
+  interpolation between the profile values at the two ends) and
+  scale each pixel by the profile ratio, so the pixel's own texture
+  survives. The dark-pixel-only lift (toward a per-row neighbour
+  reference, capped so no region can pass its neighbours) is the
+  other safe tool — bright text, lantern glow and lit windows are
+  untouched by construction.
+- **The dip metric is not the verdict for every strip.** Matcha's
+  post must stay darker than the bright shoji next to it, so its
+  dip barely moves (+31 → +29) even when the strip is fixed — the
+  honest metric there is the cliff step (79 → ~21). Report the
+  metric that matches the cause, and let the viewed crop decide.
+- **View-the-crop is the check that catches edit artifacts.** The
+  blur mistake was invisible in the numbers (the dip improved) and
+  only visible in the crop. Never skip viewing the edited crop, and
+  never push an art edit whose crop was not viewed at full size.
+- **A service restart wipes /tmp — including the depth model.**
+  Re-download the V2 Small ONNX (~27 MB, sha256 `fcf51f1b…`) and
+  re-run any depth/slice step that was in flight; verify by file
+  mtime + a load test, never by assuming the earlier run finished.
+
 ## Push rules (repo-wide, learned 2026-11-18)
 
 - **Update the build stamp on every index.html push.** The title

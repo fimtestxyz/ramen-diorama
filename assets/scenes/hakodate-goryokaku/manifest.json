@@ -1,0 +1,105 @@
+{
+  "scene": "hakodate-goryokaku",
+  "name": "Hakodate Goryokaku star fort in snow",
+  "source": "assets/scenes/hakodate-goryokaku/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.2581
+    },
+    "layer1": {
+      "file": "layers/layer1-far-fort.png",
+      "z": -0.05,
+      "coverage": 0.1214
+    },
+    "layer2": {
+      "file": "layers/layer2-mid-fort.png",
+      "z": 0.15,
+      "coverage": 0.2023
+    },
+    "layer3": {
+      "file": "layers/layer3-near-fort.png",
+      "z": 0.2,
+      "coverage": 0.2268
+    },
+    "layer4": {
+      "file": "layers/layer4-foreground-pines.png",
+      "z": 0.34,
+      "coverage": 0.1914
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.2023
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.2164
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0079
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.0014
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.7008
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.2685
+    }
+  },
+  "anchors": {
+    "office_center": [
+      915,
+      350
+    ],
+    "pavilion": [
+      803,
+      353
+    ],
+    "annex": [
+      710,
+      420
+    ],
+    "mid_building": [
+      1067,
+      460
+    ],
+    "big_pine": [
+      1370,
+      690
+    ],
+    "bridge": [
+      1040,
+      540
+    ],
+    "street_band": [
+      0,
+      760,
+      1920,
+      1080
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.008,
+    "p99": 0.16,
+    "max": 7.1
+  }
+}
