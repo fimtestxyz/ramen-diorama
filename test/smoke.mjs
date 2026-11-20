@@ -165,6 +165,15 @@ test('structure: cloth-static is fetched and built only for cloth scenes; textur
   assert.ok(!html.includes('}, undefined, reject);'), 'no bare reject passthrough remains in loadTexture');
 });
 
+test('structure: build stamp is present in the title block', () => {
+  // 2026-11-20: a stale pre-fix page on a phone is indistinguishable
+  // from the current build without it. The stamp is a build timestamp
+  // (YYYY-MM-DD HH:MM, +08) — update it on every index.html push.
+  // The test pins presence + format, never the value.
+  const m = html.match(/id="build-stamp"[^>]*>build (\d{4}-\d{2}-\d{2} \d{2}:\d{2})</);
+  assert.ok(m, 'build stamp missing from the title block');
+});
+
 test('structure: importmap pins three@0.187.0 on jsDelivr, no other CDN', () => {
   const importmap = JSON.parse(blocks[0]);
   assert.equal(importmap.imports.three,

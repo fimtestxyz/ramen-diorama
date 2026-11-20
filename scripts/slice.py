@@ -116,8 +116,20 @@ def ellipse(mask, spec, value=255):
     return mask
 
 
-def soft(mask, dilate_px=2, blur_px=3):
-    """Feather a binary mask: dilate slightly (edge bleed), then blur."""
+def soft(mask, dilate_px=12, blur_px=3):
+    """Feather a binary mask: dilate (edge bleed), then blur.
+
+    The dilation is 12 px, not 2: the renderer minifies the plates
+    (1.18x overscan at rest, up to ~2.4x at the lowest quality tier),
+    and mipmapped bilinear filtering blurs the alpha edge. With only
+    a 2 px bleed the blurred edge lets the inpainted backdrop leak
+    through at every layer boundary — visible as blurred rectangular
+    seams at rest (live E2E 2026-11-20). A 12 px bleed (the Shinya
+    showcase's number) keeps the total coverage ~1 at the true
+    boundary even after the mip blur, so the seam disappears; the
+    dilated band carries the source colour, so at rest it is
+    invisible, and during parallax it is a <=12 px fringe that moves
+    with the wrong layer — negligible against the shift."""
     if dilate_px:
         k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * dilate_px + 1, 2 * dilate_px + 1))
         mask = cv2.dilate(mask, k)
@@ -304,7 +316,10 @@ def main():
     holes = np.zeros((H, W), np.uint8)
     for name in ("layer1", "layer2", "layer3", "layer4"):
         holes |= layer_masks[name]
-    holes_d = cv2.dilate(holes, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+    holes_d = cv2.dilate(holes, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
+    # 15 px, not 9: the layer alpha is dilated 12 px (see soft()), so
+    # the backdrop must be inpainted at least that far out, or the
+    # foreground ghost would show during parallax.
     print(f"foreground coverage: {(holes > 0).mean():.3f} of frame")
     backdrop = inpaint_backdrop(src, holes_d)
 
@@ -315,7 +330,7 @@ def main():
     composite = np.zeros((H, W, 4), np.float32)  # RGBA float, for rest check
     for name, (fname, z) in layers.items():
         hard = layer_masks[name]
-        alpha = soft(hard, dilate_px=2, blur_px=3).astype(np.float32) / 255.0
+        alpha = soft(hard, dilate_px=12, blur_px=3).astype(np.float32) / 255.0
         if name == "layer0":
             rgb = backdrop
             alpha = np.ones((H, W), np.float32)  # backdrop is opaque

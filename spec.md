@@ -834,3 +834,64 @@ current Chinese UI. Chinese stays the default.
   two changed strings above).
 - The switch-scene toast shows the translated name in each language.
 - No console errors on a language switch mid-load or mid-download.
+
+## Layer-seam fix (2026-11-20, local only — not yet pushed or live-verified)
+
+User request 2026-11-20 18:40, after the 17:42–17:55 live E2E (verdict
+SHIPPABLE) noted blurred rectangular layer seams at rest in every
+scene — most obvious in 抹茶屋 (a brown vertical strip through the
+shelves, a grey strip over the garden) and 大阪喫茶店.
+
+### Root cause (measured, not guessed)
+
+The plates are minified by the renderer — 1.18x overscan at rest, up
+to ~2.4x at the lowest quality tier — and mipmapped bilinear
+filtering blurs the alpha edge. With the old 2 px feather, the
+blurred edge lets the inpainted backdrop leak through at every layer
+boundary. Measured by simulating the minification (downscale each
+plate 1/1.18 with bilinear, upscale back, composite, compare against
+the resampled source — the generic resample blur cancels out, so
+what remains is the boundary error): **0.5–0.9% of pixels off by
+>12** with the old assets. Total coverage at rest was 1.0
+everywhere, so this was NOT a missing-pixel gap, and the RGB of the
+transparent pixels was NOT the driver — a colour-bleed experiment
+changed the minified error by <0.01, so no bleed step was added
+(it would also have undone the PNG compression from zeroing RGB
+where alpha is ~0).
+
+### Fix
+
+- **12 px edge bleed** (`soft()` in `scripts/slice.py`, the Shinya
+  showcase's number): layer alpha is dilated 12 px, then blurred
+  (sigma 3). The total coverage stays ~1 at the true boundary even
+  after the mip blur, so the seam disappears; the dilated band
+  carries the source colour, so at rest it is invisible, and during
+  parallax it is a <=12 px fringe moving with the wrong layer —
+  negligible against the shift.
+- **Backdrop inpaint holes dilated 15 px** (was 9), so no foreground
+  ghost remains inside the 12 px band to show during parallax.
+- Re-sliced all 6 scenes (ramen + 5). Rest composite actually
+  improved (ramen mean abs diff 0.305 → 0.058, osaka 0.464 → 0.067)
+  because the dilated layers now cover the boundaries fully.
+- **32 PNGs changed** (all 30 layer plates + 2 cloth-static
+  variants); all 42 masks byte-identical; depth maps and source art
+  untouched. The 6 manifests changed only in `rest_composite`
+  (better numbers). PNGs needing re-upload (browser): the 30 layer
+  plates + `assets/layers/layer2-static.png` +
+  `assets/scenes/tokyo-shotengai/layers/layer3-static.png`.
+- Tests: the alpha-coverage upper bound is now +0.08 (was +0.03;
+  measured max growth +0.051, osaka layer2), and both Python suites
+  gained a minified-composite check (mean < 0.15, zero pixels off
+  by >12 — measured 0.03–0.04 mean, 0.00% on all 6 scenes).
+  JS 59/59, both Python suites pass.
+
+### Live E2E still to check for this change (do NOT close it without this)
+
+- At rest in each of the 6 scenes: no visible seams / strips along
+  layer boundaries (check 抹茶屋 shelves + garden and 大阪喫茶店
+  first — the worst two).
+- During parallax: no ghost fringe at boundaries, no missing slivers
+  at the frame edges.
+- The cloth scenes (ramen, shotengai) still render the strips
+  correctly — the static variants were regenerated from the
+  re-sliced layers.

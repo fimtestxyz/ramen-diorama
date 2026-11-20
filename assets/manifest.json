@@ -106,8 +106,8 @@
     "counter_top_y": 780
   },
   "rest_composite": {
-    "mean_abs_diff": 0.305,
-    "p99": 7.88,
-    "max": 132.0
+    "mean_abs_diff": 0.058,
+    "p99": 1.41,
+    "max": 11.2
   }
 }

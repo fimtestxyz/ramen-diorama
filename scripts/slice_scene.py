@@ -190,7 +190,10 @@ def slice_scene(slug, cfg, root):
     for name in LAYER_ORDER:
         holes |= layer_masks[name]
     holes_d = cv2.dilate(holes, cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (9, 9)))
+        cv2.MORPH_ELLIPSE, (15, 15)))
+    # 15 px: the layer alpha is dilated 12 px (see soft() in slice.py),
+    # so the backdrop must be inpainted at least that far out, or the
+    # foreground ghost would show during parallax.
     print(f"[{slug}] foreground coverage: {(holes > 0).mean():.3f} of frame")
     backdrop = inpaint_backdrop(src, holes_d, cfg)
 
@@ -202,7 +205,7 @@ def slice_scene(slug, cfg, root):
     for name in ("layer0", "layer1", "layer2", "layer3", "layer4"):
         fname, z = layers[name]
         hard = layer_masks[name]
-        alpha = soft(hard, dilate_px=2, blur_px=3).astype(np.float32) / 255.0
+        alpha = soft(hard, dilate_px=12, blur_px=3).astype(np.float32) / 255.0
         if name == "layer0":
             rgb = backdrop
             alpha = np.ones((H, W), np.float32)

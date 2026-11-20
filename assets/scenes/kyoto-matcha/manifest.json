@@ -95,8 +95,8 @@
   "cloth_layer": null,
   "static_file": null,
   "rest_composite": {
-    "mean_abs_diff": 0.333,
-    "p99": 8.28,
-    "max": 114.1
+    "mean_abs_diff": 0.072,
+    "p99": 1.6,
+    "max": 8.0
   }
 }

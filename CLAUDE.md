@@ -253,6 +253,20 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
   `.message`, so the toast showed "[object Event]" — a second
   defect hiding the first. Wrap loader rejections in a real
   `Error` naming the URL.
+- **A 2 px feather is not enough edge bleed for a mipmapped plate.**
+  The layer seams (2026-11-20 live E2E): the renderer minifies the
+  plates 1.18–2.4x, the mip blur eats the alpha edge, and the
+  inpainted backdrop leaks at every boundary — measured 0.5–0.9%
+  of pixels off by >12 in a minification simulation. The fix is a
+  12 px alpha dilation (the Shinya showcase's number) plus
+  dilating the backdrop inpaint holes to 15 px, so no foreground
+  ghost sits inside the band. A colour bleed into transparent
+  pixels was measured and REJECTED: it changed the minified error
+  by <0.01 and would have undone the PNG compression from zeroing
+  RGB where alpha is ~0. Pin it with the minified-composite test
+  (resample 1/1.18, compare against the resampled source), not
+  with the unfiltered composite — the unfiltered composite was
+  already ~0.3 and hid the whole problem.
 
 ## Multi-language UI lessons (2026-11-20, zh / en / ja)
 
@@ -292,6 +306,12 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
 
 ## Push rules (repo-wide, learned 2026-11-18)
 
+- **Update the build stamp on every index.html push.** The title
+  block carries `<span id="build-stamp">build YYYY-MM-DD HH:MM</span>`
+  (+08, the time the push is made). It exists so a stale cached
+  copy on a phone is distinguishable from the current build — a
+  stamp older than the push is a stale page, not a new bug. The
+  smoke test pins its presence + format, never its value.
 - The Muse GitHub App pushes ordinary files fine (installation is
   All repositories). It has NO workflows write permission — any batch
   containing `.github/workflows/` fails atomically with 403. Push

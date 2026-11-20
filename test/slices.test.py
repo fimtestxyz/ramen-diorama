@@ -70,10 +70,13 @@ def main():
             check("layer0 is opaque everywhere (inpainted base)", cov > 0.999,
                   f"cov {cov:.3f}")
         else:
-            # Feathered edges make alpha coverage slightly larger than the
-            # assignment fraction; it must never be smaller.
+            # Feathered edges make alpha coverage larger than the
+            # assignment fraction; it must never be smaller. The 12px
+            # edge bleed (see soft() in scripts/slice.py) grows thin
+            # layers the most — osaka layer2 gains +0.051 — so the
+            # upper bound is +0.08, not the old +0.03.
             check(f"{lid} alpha coverage >= assignment ({info['coverage']:.3f} vs {cov:.3f})",
-                  info["coverage"] - 0.005 <= cov <= info["coverage"] + 0.03,
+                  info["coverage"] - 0.005 <= cov <= info["coverage"] + 0.08,
                   f"diff {cov - info['coverage']:.4f}")
 
     print("layer2-static (noren punched out)")
@@ -137,6 +140,35 @@ def main():
     p99 = float(np.percentile(diff, 99))
     check("composite mean abs diff < 1.0", mean < 1.0, f"mean {mean:.3f}")
     check("composite p99 diff < 20", p99 < 20, f"p99 {p99:.2f}")
+
+    print("minified composite == minified source (12px edge bleed)")
+    # Simulates the renderer's texture minification at rest (1.18x
+    # overscan): downscale each plate 1/1.18 with bilinear, upscale
+    # back, composite, and compare against the resampled source. The
+    # generic resample blur cancels out (both sides are resampled),
+    # so what remains is the layer-boundary error. With the old 2px
+    # bleed the mip-blurred alpha edge lets the inpainted backdrop
+    # leak at every boundary: 0.5-0.9% of pixels off by >12 — the
+    # blurred rectangular seams the live E2E saw. With the 12px bleed
+    # the total coverage stays ~1 at the true boundary: 0.00%.
+    def resample(im):
+        return np.asarray(
+            Image.fromarray(im).resize((1627, 915), Image.BILINEAR)
+            .resize((W, H), Image.BILINEAR))
+    src_min = resample(src[:, :, :3].astype(np.uint8)).astype(np.float32)
+    comp_min = np.zeros((H, W, 3), dtype=np.float32)
+    for lid, info in manifest["layers"].items():
+        lay = np.asarray(Image.open(os.path.join(ASSETS, info["file"]))
+                         .convert("RGBA"))
+        lay = resample(lay).astype(np.float32)
+        a = lay[:, :, 3:4] / 255.0
+        comp_min = comp_min * (1 - a) + lay[:, :, :3] * a
+    mdiff = np.abs(comp_min - src_min).mean(axis=2)
+    check("minified composite mean diff < 0.15",
+          float(mdiff.mean()) < 0.15, f"mean {float(mdiff.mean()):.3f}")
+    check("minified composite: no pixel off by >12",
+          float((mdiff > 12).mean()) == 0.0,
+          f"px>12 {float((mdiff > 12).mean()) * 100:.3f}%")
 
     print("round 2: fragment-fetch model (measured layer alpha coverages)")
     # Texture fetches per frame at 1919x998 (1,914,162 visible px),
