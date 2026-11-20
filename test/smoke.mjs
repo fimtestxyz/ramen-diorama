@@ -233,3 +233,94 @@ test('round 1: H hides all HUD chrome via one body class; rings + swirl wired', 
   assert.ok(html.includes('L.addRing(state.sim, fx, fy, 1.2)'), 'street tap adds a splash ring');
   assert.ok(html.includes('L.addSwirl(state.sim, d)'), 'steam drag accumulates swirl');
 });
+
+/* ------------------------------------------------------------------ */
+/* Fix round 2 — performance diagnosis (2026-11-20 live E2E: fps 4-5) */
+/* ------------------------------------------------------------------ */
+
+test('round 2: fps meter reads the raw frame interval, not the clamped sim dt', () => {
+  // The old meter accumulated dtWall, which is clamped to 0.25 s, so it
+  // floored at 4 fps and could not show slow frames truthfully — the
+  // round-1 re-test reported "no improvement" from Low quality even if
+  // the frame time had halved.
+  assert.ok(html.includes('const rawDt ='), 'raw frame interval is computed');
+  assert.ok(html.includes('fpsTime += rawDt'), 'meter accumulates the raw interval');
+  assert.ok(!html.includes('fpsTime += dtWall'), 'meter must not accumulate the clamped dt');
+  assert.ok(html.includes('state.frameMs'), 'frame time in ms is tracked');
+  assert.ok(html.includes("el.textContent = state.fps + ' fps · ' + state.frameMs + 'ms'"),
+    'fps readout shows fps + frame ms');
+});
+
+test('round 2: quality tiers reduce fragment cost, and Auto shows the active tier', () => {
+  // MSAA off: the post pass is a fullscreen quad, so 4x MSAA multiplies
+  // its fragment cost ~4x in software rendering for no visible benefit
+  // (the scene render into postRT was never multisampled — render
+  // targets don't inherit canvas MSAA — so only the post quad changes).
+  assert.ok(html.includes('new THREE.WebGLRenderer({ antialias: false'),
+    'antialias is off');
+  // The auto evaluator must call the tier change as an auto step so the
+  // UI reflects it — the round-1 re-test reported "Auto never stepped
+  // down" because the select only ever showed the mode.
+  assert.ok(html.includes('applyRenderScale(next, true)'), 'auto evaluator marks its step');
+  assert.ok(html.includes("querySelector('option[value=\"auto\"]')"),
+    'applyRenderScale rewrites the Auto option label');
+  assert.ok(html.includes('qualityTierName'), 'tier names are human-readable');
+  // Cheap post at the lowest tier: a single fetch, no CAS / heat-haze.
+  assert.ok(html.includes('uCheap'), 'cheap-post uniform exists');
+  assert.ok(html.includes('postMat.uniforms.uCheap.value = renderScale <= 0.5 ? 1 : 0'),
+    'cheap post engages at the lowest tier');
+  // Woman shader discards transparent fragments before the CAS fetches.
+  const wfrag = html.match(/const WOMAN_FRAG = \/\* glsl \*\/`([\s\S]*?)`;/);
+  assert.ok(wfrag, 'WOMAN_FRAG found');
+  const discardAt = wfrag[1].indexOf('if (c.a < 0.02) discard;');
+  const casAt = wfrag[1].indexOf('5-tap neighbourhood-clamped CAS');
+  assert.ok(discardAt > 0 && casAt > discardAt, 'discard precedes the CAS fetches');
+  // Lantern plates: alpha test discards their ~97-99% transparent
+  // pixels after the fetch, so it saves the blend/overdraw cost (not
+  // the texture fetch — the fetch happens first). The fetch saving is
+  // the woman discard above.
+  assert.ok(html.includes('alphaTest: 0.02'), 'lantern plates carry an alpha test');
+});
+
+test('round 2: sliders respond to pointer commit as well as drag/keyboard', () => {
+  // The round-1 re-test saw no pointer response; the wiring is a plain
+  // native range + 'input', the panel sits above the canvas at
+  // z-index 10 with no pointer-events block, and keyboard control
+  // works — the harness observation is a synthetic-input artifact.
+  // 'change' is belt-and-braces for pointer commit.
+  assert.ok(html.includes("addEventListener('change', onSlider)"),
+    'sliders listen for change as well as input');
+  for (const k of ['rain', 'wind', 'flicker', 'steam', 'parallax']) {
+    assert.ok(html.includes(`<label for="s-${k}">`), `label for s-${k} focuses its slider`);
+  }
+});
+
+test('round 2: playlist UI is wired (panel, transport, auto-advance, attribution)', () => {
+  // Panel + transport exist and the radio moved into the music panel.
+  const panelAt = html.indexOf('id="music-panel"');
+  const radioAt = html.indexOf('id="btn-radio"');
+  const inspAt = html.indexOf('id="inspector"');
+  assert.ok(panelAt > 0 && radioAt > panelAt && radioAt < inspAt,
+    'radio button lives inside the music panel');
+  assert.ok(html.includes('id="btn-music"'), 'music button opens the panel');
+  assert.ok(html.includes('L.PLAYLIST.forEach((t, i) => {'), 'track list is built from PLAYLIST');
+  assert.ok(html.includes("playlistAudio.addEventListener('ended'"),
+    'ended handler auto-advances');
+  assert.ok(html.includes('L.playlistNext(playlistIndex, L.PLAYLIST.length)'),
+    'auto-advance wraps via playlistNext');
+  // Attribution is shown for the playing track (CC BY 4.0 requirement).
+  assert.ok(html.includes("$('music-attr').textContent = t"),
+    'attribution line follows the playing track');
+  // Load on demand: nothing is preloaded on page load (24 MB total).
+  assert.ok(html.includes("playlistAudio.preload = 'none'"), 'playlist does not preload');
+  assert.equal([...html.matchAll(/playlistAudio\.src/g)].length, 1,
+    'src is set in exactly one place (playTrack)');
+  // Playback runs through the music bus (MediaElementSource -> music
+  // gain -> master), so the audio switch and volume slider apply.
+  assert.ok(html.includes('createMediaElementSource(playlistAudio)'), 'MediaElementSource created');
+  assert.ok(html.includes('this.nodes.music'), 'music bus exists in AudioEngine');
+  assert.ok(html.includes('g.connect(this.nodes.music)'), 'radio routes through the music bus');
+  // The music panel is HUD chrome, so H hides it with everything else.
+  assert.ok(panelAt > 0 && html.includes('id="music-panel" class="hud glass hidden"'),
+    'music panel is hud chrome');
+});

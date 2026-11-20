@@ -138,6 +138,43 @@ def main():
     check("composite mean abs diff < 1.0", mean < 1.0, f"mean {mean:.3f}")
     check("composite p99 diff < 20", p99 < 20, f"p99 {p99:.2f}")
 
+    print("round 2: fragment-fetch model (measured layer alpha coverages)")
+    # Texture fetches per frame at 1919x998 (1,914,162 visible px),
+    # computed from the shipped layer PNGs (alpha > 3 counts as covered).
+    # The model is the evidence for the round-2 fixes — and its honest
+    # limits: an alpha test discards AFTER the texture fetch, so the
+    # lantern alphaTest saves blend/overdraw cost, not fetches; only
+    # the woman early-discard (before the 4 CAS neighbour fetches)
+    # saves fetches on a plate. The big win is the post pass: MSAA x4
+    # multiplied its 5 fetches by 4 (the scene render into postRT was
+    # never multisampled — only the post quad changed).
+    cov = {}
+    for lid, info in manifest["layers"].items():
+        cov[lid] = alpha_cov(os.path.join(ASSETS, info["file"]))
+    px = 1919 * 998 / 1e6  # megapixels per frame
+    # Before: every full-frame plate pays 1 fetch/fragment; the woman
+    # plate pays 5 (1 + 4 CAS neighbours); noren strips pay ~coverage;
+    # the post pass pays 5 fetches x 4x MSAA.
+    before = px * (1 + 1 + 1 + 1 + 5 + cov["layer2"] + 5 * 4)
+    # After (high/mid tier): MSAA off (post = 5); woman discards before
+    # CAS (1 fetch on transparent, 5 on the covered fraction); lantern
+    # plates still fetch (alphaTest is after the fetch) but skip blending.
+    after = px * (1 + 1 + 1 + 1 + (1 - cov["layer4"]) + 5 * cov["layer4"]
+                  + cov["layer2"] + 5)
+    # After (low tier): cheap post is a single fetch (no CAS / heat-haze).
+    after_low = after - px * 4
+    check("woman plate coverage < 40% (early discard pays off)",
+          cov["layer4"] < 0.40, f"cov {cov['layer4']:.3f}")
+    check("lantern plates coverage < 5% (alpha test pays off in blend)",
+          cov["layer1"] < 0.05 and cov["layer3"] < 0.05,
+          f"l1 {cov['layer1']:.3f} l3 {cov['layer3']:.3f}")
+    check(f"fragment model high/mid: {after:.1f}M vs {before:.1f}M "
+          f"fetches/frame ({after / before:.0%} of before)",
+          after < before * 0.45, f"ratio {after / before:.2f}")
+    check(f"fragment model low tier: {after_low:.1f}M vs {before:.1f}M "
+          f"({after_low / before:.0%} of before)",
+          after_low < before * 0.30, f"ratio {after_low / before:.2f}")
+
     print()
     if failures:
         print(f"{len(failures)} FAILURES: {failures}")

@@ -2,7 +2,7 @@
 // Loads the block via vm so the tests always run against the shipped code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -345,4 +345,48 @@ test('round 1: quality tiers step down when slow, up when fast', () => {
   assert.equal(L.qualityTierFor(60, 1), 1, 'ceiling at 1');
   assert.equal(L.qualityTierFor(30, 1), 1, 'mid-range fps holds the tier');
   assert.equal(L.qualityTierFor(30, 0.5), 0.5);
+});
+
+/* ------------------------------------------------------------------ */
+/* Fix round 2 — playlist (real tracks, CC BY 4.0)                     */
+/* ------------------------------------------------------------------ */
+
+test('round 2: playlist matches the verified music manifest', () => {
+  // The 6 tracks were downloaded and verified (ffprobe + full decode)
+  // 2026-11-20; the logic block is the single source of truth the UI
+  // renders from, so it must match the files on disk exactly.
+  assert.equal(L.PLAYLIST.length, 6);
+  const seen = new Set();
+  for (const t of L.PLAYLIST) {
+    assert.ok(t.file.endsWith('.mp3'), t.file);
+    assert.ok(!seen.has(t.file), `duplicate file ${t.file}`);
+    seen.add(t.file);
+    const p = path.join(root, 'assets', 'music', t.file);
+    assert.ok(existsSync(p), `missing music file ${t.file}`);
+    assert.ok(statSync(p).size > 1_000_000, `${t.file} is suspiciously small`);
+    assert.ok(t.title && t.artist, 'title + artist present');
+    assert.match(t.dur, /^\d+:\d{2}$/, `duration format ${t.dur}`);
+    // Attribution is a license requirement, not decoration: every track
+    // must carry its exact CC BY 4.0 attribution text.
+    assert.ok(t.attribution.includes('CC BY 4.0'), `${t.file} attribution mentions CC BY 4.0`);
+    assert.ok(t.attribution.includes(t.artist), `${t.file} attribution names the artist`);
+    assert.ok(t.attribution.includes('creativecommons.org/licenses/by/4.0'),
+      `${t.file} attribution links the license`);
+  }
+  // Order is the play order: 3 x 1000 Handz, then 3 x Purrple Cat.
+  assert.deepEqual([...L.PLAYLIST.map((t) => t.artist)],
+    ['1000 Handz', '1000 Handz', '1000 Handz', 'Purrple Cat', 'Purrple Cat', 'Purrple Cat']);
+  // Listed durations sum to 16:48 (precise ffprobe total is 16:49).
+  const total = L.PLAYLIST.reduce((s, t) => {
+    const [m, sec] = t.dur.split(':').map(Number);
+    return s + m * 60 + sec;
+  }, 0);
+  assert.equal(total, 1008, `playlist listed durations total 16:48, got ${total}s`);
+});
+
+test('round 2: playlist next/prev wrap around', () => {
+  assert.equal(L.playlistNext(5, 6), 0, 'next after the last track wraps to the first');
+  assert.equal(L.playlistNext(0, 6), 1);
+  assert.equal(L.playlistPrev(0, 6), 5, 'prev before the first track wraps to the last');
+  assert.equal(L.playlistPrev(3, 6), 2);
 });

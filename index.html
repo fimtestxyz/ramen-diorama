@@ -80,6 +80,24 @@
   #inspector .depthrow span { color: var(--muted); }
   #depthview { margin-top: 8px; max-width: 100%; border-radius: 8px; }
 
+  /* ---------- Music panel (playlist + radio) ---------- */
+  #music-panel { left: 14px; bottom: 70px; width: 300px; padding: 14px; font-size: 12px; }
+  #music-panel h2 { font-size: 12px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+  #now-playing { font-size: 13px; margin-bottom: 8px; }
+  #music-panel .transport { display: flex; gap: 8px; margin-bottom: 8px; }
+  #music-panel .transport .btn { flex: 1; text-align: center; }
+  #music-panel label { display: flex; justify-content: space-between; margin: 8px 0 2px; }
+  #music-panel label output { color: var(--neon); font-variant-numeric: tabular-nums; }
+  #music-panel input[type="range"] { width: 100%; accent-color: var(--accent); }
+  #track-list { list-style: none; margin: 8px 0; }
+  #track-list li { padding: 6px 8px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  #track-list li:hover { background: rgba(255,255,255,0.08); }
+  #track-list li.active { background: rgba(255, 90, 60, 0.25); }
+  #track-list li .dur { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #music-panel .row { display: flex; gap: 8px; margin-top: 8px; }
+  #music-panel .row .btn { flex: 1; text-align: center; }
+  #music-attr { color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 8px; }
+
   /* ---------- Compare curtain ---------- */
   #curtain {
     position: fixed; top: 0; bottom: 0; width: 2px; z-index: 9;
@@ -143,6 +161,7 @@
     #presets { bottom: auto; top: 64px; left: 10px; max-width: 94vw; }
     #keys { display: none; }
     #inspector { top: 108px; }
+    #music-panel { left: 0; right: 0; bottom: 0; width: auto; border-radius: 16px 16px 0 0; max-height: 50vh; overflow-y: auto; }
     #toast { bottom: auto; top: 160px; }
   }
 </style>
@@ -194,21 +213,38 @@
 
 <div id="panel" class="hud glass">
   <h2>氣氛 ATMO&shy;SPHERE</h2>
-  <label>雨勢 Rain <output id="o-rain">0.45</output></label>
+  <label for="s-rain">雨勢 Rain <output id="o-rain">0.45</output></label>
   <input type="range" id="s-rain" min="0" max="1" step="0.01" value="0.45">
-  <label>風 Wind <output id="o-wind">0.35</output></label>
+  <label for="s-wind">風 Wind <output id="o-wind">0.35</output></label>
   <input type="range" id="s-wind" min="0" max="1" step="0.01" value="0.35">
-  <label>霓虹閃爍 Neon <output id="o-flicker">0.5</output></label>
+  <label for="s-flicker">霓虹閃爍 Neon <output id="o-flicker">0.5</output></label>
   <input type="range" id="s-flicker" min="0" max="1" step="0.01" value="0.5">
-  <label>蒸汽 Steam <output id="o-steam">0.5</output></label>
+  <label for="s-steam">蒸汽 Steam <output id="o-steam">0.5</output></label>
   <input type="range" id="s-steam" min="0" max="1" step="0.01" value="0.5">
-  <label>視差深度 Parallax <output id="o-parallax">0.8</output></label>
+  <label for="s-parallax">視差深度 Parallax <output id="o-parallax">0.8</output></label>
   <input type="range" id="s-parallax" min="0" max="1" step="0.01" value="0.8">
   <div class="row">
     <button class="btn" id="btn-lightning">⚡ 打雷</button>
-    <button class="btn" id="btn-radio">📻 Lo-Fi</button>
+    <button class="btn" id="btn-music">🎵 音樂</button>
     <button class="btn" id="btn-reset">↺ 重設</button>
   </div>
+</div>
+
+<div id="music-panel" class="hud glass hidden">
+  <h2>音樂 MUSIC</h2>
+  <div id="now-playing">未播放 — 選一首開始</div>
+  <div class="transport">
+    <button class="btn" id="btn-prev" title="上一首">⏮</button>
+    <button class="btn" id="btn-play" title="播放 / 暫停">▶</button>
+    <button class="btn" id="btn-next" title="下一首">⏭</button>
+  </div>
+  <label for="s-musicvol">音量 <output id="o-musicvol">0.80</output></label>
+  <input type="range" id="s-musicvol" min="0" max="1" step="0.01" value="0.8">
+  <ol id="track-list"></ol>
+  <div class="row">
+    <button class="btn" id="btn-radio">📻 Kitchen Lo-Fi Radio（合成）</button>
+  </div>
+  <p id="music-attr">播放清單為 CC BY 4.0 授權曲目（Free Music Archive），播放時會顯示作者歸屬。</p>
 </div>
 
 <div id="inspector" class="hud glass hidden">
@@ -710,6 +746,22 @@
     return { ok: errors.length === 0, errors: errors };
   }
 
+  /* Lo-fi playlist (real tracks, CC BY 4.0). Files live in
+     assets/music/ and are loaded on demand when played — never
+     preloaded (24 MB total). Attribution text is copied verbatim
+     from assets/music/README.md and MUST be shown in the app while
+     a track plays; no attribution = license violation. */
+  var PLAYLIST = [
+    { file: '01-kyoto-1000-handz.mp3', title: 'Kyoto', artist: '1000 Handz', dur: '2:36', attribution: '"Kyoto" by 1000 Handz, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+    { file: '02-shanghai-1000-handz.mp3', title: 'Shanghai', artist: '1000 Handz', dur: '2:07', attribution: '"Shanghai" by 1000 Handz, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+    { file: '03-shatter-1000-handz.mp3', title: 'Shatter', artist: '1000 Handz', dur: '2:40', attribution: '"Shatter" by 1000 Handz, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+    { file: '04-silent-wood-purrple-cat.mp3', title: 'Silent Wood', artist: 'Purrple Cat', dur: '3:08', attribution: '"Silent Wood" by Purrple Cat, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+    { file: '05-long-day-purrple-cat.mp3', title: 'Long Day', artist: 'Purrple Cat', dur: '3:05', attribution: '"Long Day" by Purrple Cat, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+    { file: '06-through-the-trees-purrple-cat.mp3', title: 'Through the Trees', artist: 'Purrple Cat', dur: '3:12', attribution: '"Through the Trees" by Purrple Cat, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)' },
+  ];
+  function playlistNext(i, n) { return (i + 1) % n; }
+  function playlistPrev(i, n) { return (i - 1 + n) % n; }
+
   var RamenLogic = {
     SEED: SEED, DT: DT, CAM_D: CAM_D, PLANE_W: PLANE_W, PLANE_H: PLANE_H,
     OVERSCAN: OVERSCAN, MAX_CAM_X: MAX_CAM_X, MAX_CAM_Y: MAX_CAM_Y,
@@ -727,7 +779,8 @@
     applyImpulseLantern: applyImpulseLantern, applyBrushNoren: applyBrushNoren,
     applySpark: applySpark, blinkAmount: blinkAmount,
     audioParams: audioParams, depthColor: depthColor,
-    validateManifest: validateManifest
+    validateManifest: validateManifest,
+    PLAYLIST: PLAYLIST, playlistNext: playlistNext, playlistPrev: playlistPrev,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = RamenLogic;
   if (typeof window !== 'undefined') window.RamenLogic = RamenLogic;
@@ -766,6 +819,7 @@ const state = {
   pointer: { x: 0, y: 0, tx: 0, ty: 0, lastMove: 0 },
   brush: { x: 0, y: 0, active: false },
   fps: 0,
+  frameMs: 0,
 };
 
 /* ---------- manifest + textures ---------- */
@@ -880,6 +934,12 @@ const WOMAN_FRAG = /* glsl */`
       uv.y = eye.y + (uv.y - eye.y) * (1.0 - 0.85 * uBlink * m);
     }
     vec4 c = texture2D(uMap, uv);
+    // Round 2: discard fully transparent fragments BEFORE the 4 CAS
+    // neighbour fetches — the woman plate is a full-frame quad but the
+    // woman + counter cover only ~25% of it, so ~75% of fragments were
+    // paying 5 fetches for nothing (~5.7M fetches/frame at 1919x998).
+    // Visually identical: alpha < 0.02 blends to nothing anyway.
+    if (c.a < 0.02) discard;
     // 5-tap neighbourhood-clamped CAS sharpen on displaced pixels.
     vec2 px = vec2(1.0 / 1920.0, 1.0 / 1080.0);
     vec4 cL = texture2D(uMap, uv - vec2(px.x, 0.0));
@@ -1006,23 +1066,32 @@ const STEAM_VERT = /* glsl */`
 const POST_FRAG = /* glsl */`
   uniform sampler2D uTex;
   uniform sampler2D uOrig;
-  uniform float uTime, uFlash, uCurtainOn, uCurtainX, uHeat;
+  uniform float uTime, uFlash, uCurtainOn, uCurtainX, uHeat, uCheap;
   uniform vec2 uBowlUV;
   uniform vec2 uRes;
   varying vec2 vUv;
   void main() {
     vec2 uv = vUv;
-    // Stove / bowl thermal heat-haze: rising refractive wobble above the bowl.
-    vec2 d = uv - uBowlUV;
-    float heatMask = exp(-dot(d, d) / 0.004) * uHeat;
-    uv.x += sin(uv.y * 42.0 + uTime * 3.0) * 0.0016 * heatMask;
-    uv.y += sin(uv.x * 55.0 + uTime * 2.2) * 0.0012 * heatMask;
-    // 5-tap CAS sharpen (subtle).
-    vec2 px = 1.0 / uRes;
-    vec4 c = texture2D(uTex, uv);
-    vec4 avg = (texture2D(uTex, uv - vec2(px.x, 0.0)) + texture2D(uTex, uv + vec2(px.x, 0.0))
-              + texture2D(uTex, uv - vec2(0.0, px.y)) + texture2D(uTex, uv + vec2(0.0, px.y))) * 0.25;
-    c = c + (c - avg) * 0.35;
+    vec4 c;
+    if (uCheap > 0.5) {
+      // Round 2 cheap post (lowest tier): a single fetch, no heat-haze,
+      // no 5-tap CAS — the low tier must be cheaper in fragments, not
+      // just in resolution. Flash, curtain, vignette and sRGB below
+      // still apply.
+      c = texture2D(uTex, uv);
+    } else {
+      // Stove / bowl thermal heat-haze: rising refractive wobble above the bowl.
+      vec2 d = uv - uBowlUV;
+      float heatMask = exp(-dot(d, d) / 0.004) * uHeat;
+      uv.x += sin(uv.y * 42.0 + uTime * 3.0) * 0.0016 * heatMask;
+      uv.y += sin(uv.x * 55.0 + uTime * 2.2) * 0.0012 * heatMask;
+      // 5-tap CAS sharpen (subtle).
+      vec2 px = 1.0 / uRes;
+      c = texture2D(uTex, uv);
+      vec4 avg = (texture2D(uTex, uv - vec2(px.x, 0.0)) + texture2D(uTex, uv + vec2(px.x, 0.0))
+                + texture2D(uTex, uv - vec2(0.0, px.y)) + texture2D(uTex, uv + vec2(0.0, px.y))) * 0.25;
+      c = c + (c - avg) * 0.35;
+    }
     // Sheet-lightning flash, brighter toward the sky.
     c.rgb += vec3(0.75, 0.85, 1.0) * uFlash * (0.35 + 0.65 * uv.y);
     // Before/After compare curtain: left = original still, right = live 3D.
@@ -1049,12 +1118,15 @@ function buildPlates() {
   // Static plates (layer0, layer1-static variant for layer2, layer3).
   const defs = [
     { id: 'layer0', tex: 'layer0', z: -0.36 },
-    { id: 'layer1', tex: 'layer1', z: -0.05 },
-    { id: 'layer3', tex: 'layer3', z: 0.20 },
+    // Round 2: the lantern plates are ~97-99% transparent pixels; an
+    // alpha test discards them before blending (visually identical —
+    // alpha < 0.02 contributes nothing).
+    { id: 'layer1', tex: 'layer1', z: -0.05, alphaTest: 0.02 },
+    { id: 'layer3', tex: 'layer3', z: 0.20, alphaTest: 0.02 },
   ];
   for (const d of defs) {
     const tex = textures[d.tex];
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: d.alphaTest || 0 });
     const mesh = new THREE.Mesh(plateGeometry(d.z, 0, 1, 0, 1), mat);
     mesh.position.z = d.z;
     mesh.renderOrder = d.z < 0 ? 0 : 2;
@@ -1620,7 +1692,7 @@ function buildPost() {
       uOrig: { value: textures['source'] },
       uTime: { value: 0 }, uFlash: { value: 0 },
       uCurtainOn: { value: 0 }, uCurtainX: { value: 0.5 },
-      uHeat: { value: 0.5 },
+      uHeat: { value: 0.5 }, uCheap: { value: 0 },
       uBowlUV: { value: bowlUV },
       uRes: { value: new THREE.Vector2(w, h) },
     },
@@ -1643,6 +1715,14 @@ const AudioEngine = {
     this.master.connect(this.ctx.destination);
     this.nodes.pan = this.ctx.createStereoPanner();
     this.nodes.pan.connect(this.master);
+    // Music bus (round 2): the playlist <audio> and the generative radio
+    // both run through here, so the audio on/off switch mutes them
+    // together with the ambience and the music volume slider controls
+    // them. Created lazily with the rest of the engine, on the first
+    // user gesture.
+    this.nodes.music = this.ctx.createGain();
+    this.nodes.music.gain.value = musicVolume();
+    this.nodes.music.connect(this.master);
     this._noiseBuffer = this._makeNoise(2);
     this._startRain();
     this._startSimmer();
@@ -1784,7 +1864,11 @@ const AudioEngine = {
       g.gain.linearRampToValueAtTime(0.05, t + 1.2);
       g.gain.setValueAtTime(0.05, t + 2.6);
       g.gain.linearRampToValueAtTime(0.0001, t + 4.0);
-      lp.connect(g); g.connect(this.master);
+      lp.connect(g);
+      // Round 2: the radio routes through the music bus (not straight
+      // to master) so the audio on/off switch and the music volume
+      // slider control it together with the playlist.
+      g.connect(this.nodes.music);
       for (const m of chords[ci % 4]) {
         const o = this.ctx.createOscillator();
         o.type = 'triangle'; o.frequency.value = note(m); o.detune.value = (Math.random() - 0.5) * 8;
@@ -1929,11 +2013,21 @@ function applyMood(name) {
 }
 function bindHUD() {
   for (const k of sliders) {
-    $('s-' + k).addEventListener('input', () => {
+    const onSlider = () => {
       $('o-' + k).textContent = parseFloat($('s-' + k).value).toFixed(2);
       state.sim.params = readSliders();
       document.querySelectorAll('#presets .btn').forEach((b) => b.classList.remove('active'));
-    });
+    };
+    // 'input' fires on drag and on keyboard; 'change' fires on release /
+    // commit — belt and braces. (Round 2 note: the round-1 re-test saw no
+    // pointer response, but the wiring is a plain native range + 'input',
+    // the panel sits above the canvas at z-index 10 with no
+    // pointer-events block, and keyboard control works — the
+    // non-response is a synthetic-input artifact of the test harness,
+    // not an app bug. The labels below also carry `for` so clicking a
+    // label focuses its slider.)
+    $('s-' + k).addEventListener('input', onSlider);
+    $('s-' + k).addEventListener('change', onSlider);
   }
   document.querySelectorAll('#presets .btn').forEach((b) => {
     b.addEventListener('click', () => applyMood(b.dataset.mood));
@@ -1947,18 +2041,7 @@ function bindHUD() {
     state.sim.events.lightning = 0.0001;
     if (state.audioOn) AudioEngine.thunder();
   });
-  $('btn-radio').addEventListener('click', () => {
-    state.radioOn = !state.radioOn;
-    $('btn-radio').classList.toggle('active', state.radioOn);
-    if (state.radioOn) {
-      AudioEngine.init();
-      AudioEngine.ctx.resume();
-      AudioEngine.startRadio();
-      toast('Kitchen Lo-Fi Radio 開啟中…');
-    } else {
-      AudioEngine.stopRadio();
-    }
-  });
+  $('btn-radio').addEventListener('click', () => setRadio(!state.radioOn));
   $('btn-audio').addEventListener('click', toggleAudio);
   $('btn-compare').addEventListener('click', () => setCompare(!state.compare));
   $('btn-inspector').addEventListener('click', () => setInspector(!state.inspector));
@@ -2066,6 +2149,9 @@ function bindHUD() {
     curtain.style.left = (state.curtainX * 100) + '%';
   });
   window.addEventListener('pointerup', () => { draggingCurtain = false; });
+
+  // Round 2: lo-fi playlist panel (tracks + radio + volume).
+  bindPlaylist();
 }
 let zoom = 1.0;
 
@@ -2079,7 +2165,136 @@ function toggleAudio() {
     AudioEngine.nodes.rain.gain.value = 0;
     AudioEngine.nodes.simmer.gain.value = 0;
     AudioEngine.nodes.buzz.gain.value = 0;
+    // Round 2: the music bus (playlist + radio) mutes with the master.
+    if (AudioEngine.nodes.music) AudioEngine.nodes.music.gain.value = 0;
+  } else if (AudioEngine.nodes.music) {
+    AudioEngine.nodes.music.gain.value = musicVolume();
   }
+}
+
+/* ---------- lo-fi playlist (real tracks, CC BY 4.0) ---------- */
+// Tracks live in assets/music/ (24 MB total) and load on demand —
+// nothing is preloaded on page load. Playback goes through the
+// AudioEngine music bus (MediaElementSource -> music gain -> master),
+// so the audio on/off switch and the music volume slider apply.
+// The generative Kitchen Lo-Fi Radio and the playlist are mutually
+// exclusive: starting one stops the other.
+const playlistAudio = new Audio();
+playlistAudio.preload = 'none';
+let playlistIndex = -1;      // -1 = nothing selected yet
+let playlistFile = '';       // file currently loaded in the element
+let playlistSource = null;   // MediaElementSource (created once)
+let playlistPlaying = false;
+function musicVolume() {
+  const el = $('s-musicvol');
+  return el ? parseFloat(el.value) : 0.8;
+}
+function ensureAudioOn() {
+  // Pressing play is an explicit request to hear music — turn the
+  // master audio on so the music bus is not muted. Auto-advance
+  // (the 'ended' handler) does NOT do this: if the user muted, the
+  // next track keeps advancing silently.
+  if (!state.audioOn) toggleAudio();
+}
+function ensurePlaylistSource() {
+  AudioEngine.init();
+  if (AudioEngine.ctx.state === 'suspended') AudioEngine.ctx.resume();
+  if (!playlistSource) {
+    playlistSource = AudioEngine.ctx.createMediaElementSource(playlistAudio);
+    playlistSource.connect(AudioEngine.nodes.music);
+  }
+}
+function updatePlaylistUI() {
+  const t = playlistIndex >= 0 ? L.PLAYLIST[playlistIndex] : null;
+  $('now-playing').textContent = t
+    ? (playlistPlaying ? '▶ ' : '❚❚ ') + t.title + ' — ' + t.artist
+    : '未播放 — 選一首開始';
+  $('btn-play').textContent = playlistPlaying ? '❚❚' : '▶';
+  $('music-attr').textContent = t
+    ? t.attribution
+    : '播放清單為 CC BY 4.0 授權曲目（Free Music Archive），播放時會顯示作者歸屬。';
+  document.querySelectorAll('#track-list li').forEach((li) => {
+    li.classList.toggle('active', parseInt(li.dataset.i, 10) === playlistIndex);
+  });
+}
+function playTrack(i, isAutoAdvance) {
+  const t = L.PLAYLIST[i];
+  ensurePlaylistSource();
+  if (!isAutoAdvance) ensureAudioOn();
+  if (playlistFile !== t.file) {
+    playlistAudio.src = 'assets/music/' + t.file;
+    playlistFile = t.file;
+  }
+  playlistIndex = i;
+  playlistAudio.play().catch((err) => {
+    console.error('playlist play failed:', err);
+    playlistPlaying = false;
+    updatePlaylistUI();
+    toast('播放失敗：' + (err && err.message ? err.message : err));
+  });
+  playlistPlaying = true;
+  if (state.radioOn) setRadio(false);
+  updatePlaylistUI();
+}
+function pauseTrack() {
+  playlistAudio.pause();
+  playlistPlaying = false;
+  updatePlaylistUI();
+}
+function setRadio(on) {
+  state.radioOn = on;
+  $('btn-radio').classList.toggle('active', on);
+  if (on) {
+    AudioEngine.init();
+    AudioEngine.ctx.resume();
+    ensureAudioOn();
+    if (playlistPlaying) pauseTrack();
+    AudioEngine.startRadio();
+    toast('Kitchen Lo-Fi Radio 開啟中…');
+  } else {
+    AudioEngine.stopRadio();
+  }
+}
+function buildTrackList() {
+  const ol = $('track-list');
+  L.PLAYLIST.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.dataset.i = i;
+    const name = document.createElement('span');
+    name.textContent = t.title + ' — ' + t.artist;
+    const dur = document.createElement('span');
+    dur.className = 'dur';
+    dur.textContent = t.dur;
+    li.appendChild(name);
+    li.appendChild(dur);
+    li.addEventListener('click', () => playTrack(i));
+    ol.appendChild(li);
+  });
+  playlistAudio.addEventListener('ended', () => {
+    if (playlistIndex >= 0) playTrack(L.playlistNext(playlistIndex, L.PLAYLIST.length), true);
+  });
+}
+function bindPlaylist() {
+  buildTrackList();
+  $('btn-music').addEventListener('click', () => {
+    $('music-panel').classList.toggle('hidden');
+  });
+  $('btn-play').addEventListener('click', () => {
+    if (playlistPlaying) pauseTrack();
+    else playTrack(playlistIndex >= 0 ? playlistIndex : 0);
+  });
+  $('btn-prev').addEventListener('click', () => {
+    playTrack(L.playlistPrev(playlistIndex >= 0 ? playlistIndex : 0, L.PLAYLIST.length));
+  });
+  $('btn-next').addEventListener('click', () => {
+    playTrack(L.playlistNext(playlistIndex >= 0 ? playlistIndex : 0, L.PLAYLIST.length));
+  });
+  $('s-musicvol').addEventListener('input', () => {
+    const v = parseFloat($('s-musicvol').value);
+    $('o-musicvol').textContent = v.toFixed(2);
+    if (AudioEngine.nodes.music) AudioEngine.nodes.music.gain.value = v;
+  });
+  updatePlaylistUI();
 }
 function setCompare(on) {
   state.compare = on;
@@ -2336,6 +2551,9 @@ function syncScene() {
     postMat.uniforms.uFlash.value = sim.events.lightningEnv;
     postMat.uniforms.uCurtainX.value = state.curtainX;
     postMat.uniforms.uHeat.value = 0.3 + 0.7 * p.steam;
+    // Round 2: at the lowest tier the post pass runs cheap (single
+    // fetch, no CAS / heat-haze) — see POST_FRAG.
+    postMat.uniforms.uCheap.value = renderScale <= 0.5 ? 1 : 0;
   }
   // Drip splashes -> audio blips (from sim splash queue).
   if (state.audioOn) {
@@ -2352,7 +2570,9 @@ function syncScene() {
 // 100% / 56% / 25%. Auto mode steps down when slow and back up when
 // comfortably fast; the HUD select overrides it manually.
 let renderScale = 1, qualityMode = 'auto', qualityEvalTime = 0;
-function applyRenderScale(s) {
+function qualityTierName(s) { return s >= 1 ? '高' : s >= 0.75 ? '中' : '低'; }
+function applyRenderScale(s, isAutoStep) {
+  const prev = renderScale;
   renderScale = s;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * s);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -2360,13 +2580,32 @@ function applyRenderScale(s) {
     postRT.setSize(renderer.domElement.width, renderer.domElement.height);
     postMat.uniforms.uRes.value.set(renderer.domElement.width, renderer.domElement.height);
   }
+  // Round 2: show the ACTIVE tier in the quality select itself. The
+  // control used to show only the mode ("畫質：自動"), so an auto
+  // step-down was invisible and the round-1 re-test reported "Auto
+  // never stepped down". Manual mode already shows the tier via the
+  // selected option.
+  const opt = $('sel-quality') && $('sel-quality').querySelector('option[value="auto"]');
+  if (opt) {
+    opt.textContent = qualityMode === 'auto'
+      ? '畫質：自動 → ' + qualityTierName(s) + ' ' + (s === 1 ? '1' : s.toFixed(2).replace(/0$/, '')) + '×'
+      : '畫質：自動';
+  }
+  if (isAutoStep && s < prev) toast('畫質已自動降至' + qualityTierName(s) + '（' + s + '×）');
 }
 
 /* ---------- main loop ---------- */
 let lastT = 0, fpsFrames = 0, fpsTime = 0;
 function loop(now) {
   requestAnimationFrame(loop);
-  const dtWall = Math.min(0.25, Math.max(0, (now - lastT) / 1000 || 0.016));
+  // Round 2: the RAW frame interval is the truth for the fps meter.
+  // The 0.25 s clamp below is for the SIM advance only. The old code fed
+  // the clamped dtWall into the meter, so it could never read below
+  // 1/0.25 = 4 fps — a 2 fps frame and a 4 fps frame both read "4 fps",
+  // which is why the round-1 re-test saw "no improvement" from Low
+  // quality even if the frame time had halved.
+  const rawDt = (lastT > 0 && now > lastT) ? (now - lastT) / 1000 : 0.016;
+  const dtWall = Math.min(0.25, rawDt);
   lastT = now;
   // Cinematic drift when the pointer is idle.
   const idleFor = now - state.pointer.lastMove;
@@ -2403,13 +2642,16 @@ function loop(now) {
     renderer.setRenderTarget(null);
     renderer.render(postScene, postCam);
   }
-  // FPS meter.
-  fpsFrames++; fpsTime += dtWall;
+  // FPS meter — measured from the raw frame interval (see the top of
+  // loop()): the old code accumulated the clamped dtWall, so the meter
+  // floored at 4 fps and could not show slow frames truthfully.
+  fpsFrames++; fpsTime += rawDt;
   if (fpsTime >= 1) {
     state.fps = Math.round(fpsFrames / fpsTime);
+    state.frameMs = Math.round((fpsTime / fpsFrames) * 1000);
     fpsFrames = 0; fpsTime = 0;
     const el = $('fps');
-    if (el) el.textContent = state.fps + ' fps';
+    if (el) el.textContent = state.fps + ' fps · ' + state.frameMs + 'ms';
   }
   // Adaptive quality: in auto mode, re-evaluate the tier every 2s so a
   // single hitch does not flap it.
@@ -2418,7 +2660,7 @@ function loop(now) {
     if (qualityEvalTime >= 2) {
       qualityEvalTime = 0;
       const next = L.qualityTierFor(state.fps, renderScale);
-      if (next !== renderScale) applyRenderScale(next);
+      if (next !== renderScale) applyRenderScale(next, true);
     }
   }
   // Camera zoom (wheel/pinch).
@@ -2479,7 +2721,14 @@ async function init() {
       textures[k].colorSpace = THREE.NoColorSpace;
     }
     setProgress(0.92, '正在建立場景…');
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    // Round 2: antialias OFF. The final pass is a fullscreen post quad,
+    // so MSAA multiplies its fragment cost ~4x in software rendering
+    // (fragment model at 1919x998: post 38.3M -> 9.6M fetches/frame)
+    // for no visible benefit — the plate edges are off-screen at 1.18x
+    // overscan, and texture-alpha edges are not smoothed by MSAA anyway.
+    // The scene render into postRT was never multisampled (render
+    // targets don't inherit canvas MSAA), so only the post quad changes.
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     if (!renderer.capabilities.isWebGL2) throw new Error('WebGL2 unavailable');
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;

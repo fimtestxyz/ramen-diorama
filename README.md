@@ -1,7 +1,9 @@
 # Ramen Diorama — 深夜拉麵 2.5D Living Diorama
 
 One static anime illustration → a living 60 fps interactive diorama.
-No AI video, no looping MP4s, no external audio files, no cloud cost.
+No AI video, no looping MP4s, no cloud cost. Ambience is synthesised
+live; the lo-fi playlist is 6 real CC BY 4.0 tracks (user's choice —
+see `assets/music/README.md`).
 
 Faithful to the Shinya Ramen showcase spec, built in one pass. See
 [`spec.md`](spec.md) for the full spec, decisions, and acceptance criteria.
@@ -13,13 +15,21 @@ Built 2026-11-20, deployed to Vercel
 returned NOT SHIPPABLE** — rest alignment broken (noren mirrored),
 parallax gaps at full deflection, live depth model failed to load,
 puddle/steam interactions not observable, 4 fps in the cloud browser,
-H did not hide the inspector. **Fix round 1 is done locally (not yet
-pushed, not yet re-verified live)** — see "Fix round 1" in `spec.md`
-for the root causes. Headless tests: 34 JS tests (`node --test
-test/*.test.mjs test/smoke.mjs`) + Python slice tests — all passing.
-Source art `assets/source-art.png`, 1920×1080, original illustration.
-All features implemented in `index.html` (103 KB, single file, no
-build step).
+H did not hide the inspector. **Fix round 1 was pushed (`80573bc`)
+and live re-tested 15:09–15:31: every functional item PASSED** —
+rest alignment, compare, parallax with no gaps, depth model download
++ inference (~70 s), all four interactions, presets/sliders/modes/
+toggles, all shortcuts incl. the fixed H, no console errors.
+**The only failure left: fps stuck at 4–5** (software WebGL, no GPU),
+manual Low produced no improvement, Auto never visibly stepped down.
+**Fix round 2 + lo-fi playlist are done locally (not yet pushed, not
+yet re-verified live)** — see "Fix round 2" in `spec.md` for the
+diagnosis (the fps meter floored at 4 fps; the tiers did not reduce
+the dominant fragment cost) and the playlist. Headless tests: 40 JS
+tests (`node --test test/*.test.mjs test/smoke.mjs`) + Python slice
+tests — all passing. Source art `assets/source-art.png`, 1920×1080,
+original illustration. All features implemented in `index.html`
+(~115 KB, single file, no build step).
 
 ## Pipeline
 
@@ -47,7 +57,7 @@ never leave the device.
 ## Files
 
 - `spec.md` — the spec (decisions, features, acceptance criteria)
-- `index.html` — the whole app (88 KB: pure-logic `RamenLogic` block +
+- `index.html` — the whole app (~115 KB: pure-logic `RamenLogic` block +
   Three.js app module; importmap pins `three@0.187.0` on jsDelivr)
 - `assets/source-art.png` — the source illustration (1920×1080)
 - `assets/depth.png` — Depth Anything V2 Small depth map (1920×1080,
@@ -55,12 +65,16 @@ never leave the device.
 - `assets/layers/` — 5 plates (4.3 MB total) + `layer2-static.png`
   (noren panels punched out, for the 6 cloth strips)
 - `assets/masks/` — 7 stencils (92 KB total)
+- `assets/music/` — 6 lo-fi MP3s (24 MB total, 16:49, all CC BY 4.0)
+  + `README.md` (license record + attribution text). Binary — push
+  via the browser web upload, never the GitHub App.
 - `assets/manifest.json` — layers, masks, anchors, coverages
 - `scripts/depth.py` — offline depth generation (Python onnxruntime;
   see note in spec.md — the Node route failed, same weights)
 - `scripts/slice.py` — offline slicing + inpainting (Python + OpenCV)
-- `test/` — `logic.test.mjs` (14), `smoke.mjs` (9, jittered cadence),
-  `slices.test.py` (Python, layers/masks/manifest/depth/composite)
+- `test/` — `logic.test.mjs` (22), `smoke.mjs` (18, jittered cadence),
+  `slices.test.py` (Python, layers/masks/manifest/depth/composite/
+  fragment model)
 - `CLAUDE.md` — agent notes for this repo
 
 ## Measured numbers (build, 2026-11-20)
@@ -81,7 +95,23 @@ never leave the device.
 - Sim: 3600 fixed steps (60 sim-seconds) run in ~1.2–1.8 s wall on this
   throttled 1.5-CPU VM (~33× faster than real time). Rain produces
   100+ splashes per 60 s of drizzle (was 0 before the stepRain fix).
-- Tests: 23/23 JS + all Python slice tests pass (see `test/`).
+- Tests: 40/40 JS + all Python slice tests pass (see `test/`).
+- Performance (fix round 2, 2026-11-20 — fragment model at 1919×998,
+  from measured layer alpha coverages; NOT a measured fps gain):
+  before 56.1M texture fetches/frame → 21.7M at high/mid tier (39%),
+  14.0M at the low tier (25%). Biggest terms removed: post pass 4×
+  MSAA (38.3M → 9.6M, `antialias: false`), woman 5-tap CAS on a
+  75%-transparent quad (~5.7M saved by an early discard). CPU side is
+  innocent: `waterStep` ≈ 0.001 ms/step on the 32×32 grid, zero
+  per-frame texture uploads (all 9 textures static; water is a 4 KB
+  DataTexture upload). The old fps meter floored at 4 fps (it fed on
+  the sim's clamped dtWall); it now reads the raw frame interval and
+  shows `fps · frameMs`. Desktop 60 fps is NOT claimed — live E2E
+  must measure real fps.
+- Playlist: 6 tracks, 24,221,540 bytes, 16:49 — Kyoto / Shanghai /
+  Shatter (1000 Handz) + Silent Wood / Long Day / Through the Trees
+  (Purrple Cat), all CC BY 4.0 with in-app attribution. `preload =
+  'none'`; tracks load on demand only.
 
 ## Live E2E still to do (do NOT call the app done before this)
 
@@ -95,5 +125,12 @@ never leave the device.
   puddles, swirl steam, compare curtain drag, mood presets, sliders,
   inspector 6 modes + 7 layer toggles, keyboard shortcuts).
 - Audio: rain/simmer/buzz/drips/thunder/taxi/radio all synthesise;
-  no audio file in the repo.
+  playlist plays the 6 real tracks with in-app CC BY 4.0 attribution
+  (the only audio files in the repo — see the playlist exception in
+  spec.md feature 12); no 24 MB preload on page load.
+- Performance (round 2): fps on a real GPU; Auto visibly steps the
+  tier down at low fps (select label + toast); Low actually improves
+  fps. Slider pointer-drag on a real mouse. layer3 toggle hides the
+  front lantern visibly. Playlist playback + auto-advance + volume +
+  attribution visibility.
 - No console errors on load or during a 60 s interaction session.

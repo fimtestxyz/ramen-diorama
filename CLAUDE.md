@@ -22,8 +22,13 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
 - **Deterministic sim.** Fixed-step 1/60 s, seed `20261120`. A scene is
   a pure function of `t` — any frame can be frozen, screenshotted, and
   compared. A screenshot is evidence, not a lucky capture.
-- **No audio files in the repo.** All sound is synthesised live with
-  the Web Audio API.
+- **No audio files in the repo — except the lo-fi playlist.**
+  All ambience is synthesised live with the Web Audio API. The
+  explicit exception (user chose real tracks 2026-11-20): 6 CC BY 4.0
+  MP3s in `assets/music/` (Free Music Archive, 24 MB total), with
+  in-app attribution for the playing track — no attribution = license
+  violation. See `assets/music/README.md` for the license record.
+  Never add another audio file without recording the same exception.
 
 ## Key facts
 
@@ -138,6 +143,54 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
 - CI must name `test/smoke.mjs` explicitly: the shell glob
   `test/*.test.mjs` never matched it, so the smoke suite (incl. the
   index.html structural checks) was never run by CI.
+
+## Fix round 2 lessons (2026-11-20, performance + playlist)
+
+- **Measure the meter before trusting it.** The fps meter fed on the
+  sim's clamped `dtWall` (max 0.25 s), so it floored at 4 fps and
+  could not show slow frames truthfully. The sim clamp and the meter
+  must use different dt values: clamped for the sim advance, raw for
+  the meter. A meter that cannot read the failure mode is not a meter.
+- **A tier that does not reduce the dominant cost is not a tier.**
+  `applyRenderScale` shrank the buffer, but the post pass was 4×
+  MSAA'd and the woman plate paid 5-tap CAS over a full-frame quad
+  that is 75% transparent. Diagnose per-stage first (fragment-fetch
+  model from measured layer alpha coverages, in
+  `test/slices.test.py`), then fix the biggest term: MSAA off (post
+  38.3M → 9.6M fetches), woman early-discard before CAS (~5.7M
+  saved), cheap post at the lowest tier. The model is not a measured
+  fps gain — live E2E must measure real fps.
+- **Alpha test saves blend, not fetches.** In three.js the alpha test
+  runs AFTER the texture fetch (`diffuseColor = texture2D(...)`,
+  then `if (a < alphaTest) discard`). A mostly-transparent plate
+  with an alpha test still pays the fetch for every fragment; it
+  skips only the blend/overdraw. Only a discard placed BEFORE the
+  neighbour fetches (woman CAS) saves fetches. Do not claim fetch
+  savings for an alpha test.
+- **An auto step-down that the UI cannot show did not happen.**
+  Round 1's Auto evaluator worked, but the select only ever showed
+  the mode ("畫質：自動"), so the re-test reported "Auto never
+  stepped down". The active tier must be visible in the control
+  itself (option label + toast on step-down).
+- **A slider non-response can be a harness artifact.** Native
+  `<input type=range>` + `input`, panel above the canvas at z-index
+  10, no `pointer-events` block, keyboard works — the synthetic
+  pointer non-response is not an app bug. Add `change` (pointer
+  commit) + `label for` as belt-and-braces, and confirm pointer-drag
+  on a real mouse in live E2E.
+- **Playlist rules.** Tracks load on demand only (`preload = 'none'`,
+  `src` set in exactly one place, `playTrack`). Playback goes
+  through `AudioEngine.nodes.music` (MediaElementSource → music gain
+  → master) so the audio switch and volume slider apply. Playlist
+  and radio are mutually exclusive. Pressing play turns the master
+  audio on; auto-advance does NOT re-enable audio if the user muted.
+  Attribution for the playing track is a license requirement
+  (CC BY 4.0) — `RamenLogic.PLAYLIST` is the single source of truth
+  and the tests assert every track's attribution text.
+- **The music MP3s are binary (24 MB).** The GitHub App push route
+  rejects non-UTF-8 content — they go via the signed-in browser web
+  upload (like the layer PNGs), never the App. Same for any future
+  binary asset.
 
 ## Push rules (repo-wide, learned 2026-11-18)
 

@@ -2,8 +2,10 @@
 
 > Faithful to the Shinya Ramen (深夜ラーメン) 2.5D diorama showcase spec,
 > built in one pass. Single static anime illustration → living 60 fps
-> interactive diorama. No AI video, no looping MP4s, no external audio files,
-> no cloud cost.
+> interactive diorama. No AI video, no looping MP4s, no cloud cost.
+> Audio: procedural ambience is synthesised live; the lo-fi playlist
+> is 6 real CC BY 4.0 tracks (user chose real tracks 2026-11-20 —
+> see "Fix round 2" / the playlist exception below).
 
 ## Decisions locked
 
@@ -112,10 +114,20 @@
     pipeline), single-pass post with stove thermal heat-haze, draggable
     Before/After split-compare curtain (original JPEG vs live 3D).
 11. **Mood presets.** Drizzle, Typhoon, 3AM, Steam — one click each.
-12. **Procedural spatial Web Audio.** Zero audio files. Rain/downpour,
-    pitched awning drips, broth pot simmer, 120 Hz neon buzz + spark
-    crackle, thunder, wet-tire whoosh, distant JR train rumble, toggleable
-    Kitchen Lo-Fi Radio. Stereo panning tied to camera parallax.
+12. **Procedural spatial Web Audio + lo-fi playlist.** Ambience is
+    synthesised live, zero audio files: rain/downpour, pitched awning
+    drips, broth pot simmer, 120 Hz neon buzz + spark crackle, thunder,
+    wet-tire whoosh, distant JR train rumble, toggleable Kitchen Lo-Fi
+    Radio. Stereo panning tied to camera parallax. **Playlist
+    exception (user chose real tracks 2026-11-20):** 6 real lo-fi MP3s
+    in `assets/music/` (Free Music Archive, all CC BY 4.0, 24 MB total,
+    16:49) with a HUD music panel — track list, play/pause, prev/next,
+    auto-advance with wrap, volume, current-track display, and the
+    exact attribution line for the playing track (in-app attribution
+    is a license requirement). Tracks load on demand, never preloaded.
+    The generative radio stays as a separate "合成" option in the same
+    panel; playlist and radio are mutually exclusive. See
+    `assets/music/README.md` for the license record.
 13. **HUD & inspector.** Smoked-glass desktop HUD + mobile bottom sheet
     (375×812, unclipped); 5 sliders (Rain Intensity, Wind, Neon Flicker,
     Steam, Parallax Depth); Lightning trigger, Reset Defaults; 6-mode Layer
@@ -147,7 +159,9 @@
       splash puddles, swirl steam, drag compare curtain.
 - [ ] All four mood presets change the scene; all five sliders work;
       inspector shows all six modes and all seven layer toggles.
-- [ ] Audio: every named sound synthesises live; no audio file in the repo.
+- [ ] Audio: every named sound synthesises live; the playlist plays
+      the 6 real tracks with in-app CC BY 4.0 attribution (the only
+      audio files in the repo — see the playlist exception in feature 12).
 - [ ] Depth model downloads once (~27 MB), caches, works offline after.
 - [ ] No console errors on load or during a 60 s interaction session.
 - [ ] Image + depth never leave the device (no upload, no cloud call).
@@ -240,12 +254,19 @@
   `test/*.test.mjs`, which never matched `test/smoke.mjs` — the smoke
   suite was never run by CI until this fix.)
 
-## Fix round 1 (2026-11-20, local only — not yet pushed or live-verified)
+## Fix round 1 (2026-11-20 — pushed as `80573bc`, live re-tested 15:09–15:31)
 
 Live E2E 2026-11-20 13:53–14:10 (cloud browser, 1919×998, software
 WebGL) returned NOT SHIPPABLE. Every failure below was diagnosed from
 the code first (verified, not guessed), then fixed, then covered by a
-regression test. Nothing in this round was verified in a live browser.
+regression test. **Re-test 2026-11-20 15:09–15:31 (commit `80573bc`):
+every functional item PASSED** — rest alignment, compare, parallax
+with no gaps, depth model download + inference (~70 s), all four
+interactions, presets/sliders/modes/toggles, all shortcuts incl. the
+fixed H, no console errors. **The only failure left: fps stuck at
+4–5 in the cloud browser** (software WebGL, no GPU) — manual Low
+produced no improvement and Auto never visibly stepped down. That is
+fix round 2.
 
 1. **Rest alignment — noren strips vertically flipped.** `buildNorenStrips`
    placed strips at y = `(0.5 - v) * PLANE_H * s` with `v = 1 - fy/1080`
@@ -373,4 +394,161 @@ H body-class + rings + swirl wiring. Full suite after the round:
 **34/34 JS tests + all Python slice tests pass.** The rain splash-y
 assertion was updated to the flipped convention (it failed first, as
 expected — the flip changed the contract).
+
+## Fix round 2 (2026-11-20, local only — not yet pushed or live-verified)
+
+Live E2E re-test 2026-11-20 15:09–15:31 (commit `80573bc`) passed
+everything functional; the ONLY failure was fps stuck at 4–5 in the
+cloud browser (software WebGL, no GPU), with manual Low producing no
+improvement and Auto never visibly stepping down. This round diagnoses
+first, then fixes — plus the lo-fi playlist the user chose the same
+day. Nothing in this round is verified in a live browser yet.
+
+### Part A — performance diagnosis (measured, not guessed)
+
+Per-stage headless harness (`/tmp/r2-perf.mjs`, ephemeral) + layer
+alpha coverages measured from the shipped PNGs (woman 0.251, rear
+lantern 0.018, noren 0.209, front lantern 0.029):
+
+1. **The fps meter lied — it floored at 4 fps.** `loop()` feeds the
+   fps meter the SAME `dtWall` it feeds the sim, and `dtWall` is
+   clamped to 0.25 s (`Math.min(0.25, ...)`). So the meter could never
+   read below 1/0.25 = 4 fps: a 2 fps frame and a 4 fps frame both
+   read "4 fps". The round-1 re-test's "Low produced no improvement"
+   is therefore unproven — the frame time may have halved and the
+   meter could not have shown it. Verified numerically: a 4-frame
+   0.5 s sequence reads 4 fps through the old meter, 2 fps through
+   the raw interval. Fix: the loop now computes `rawDt` (unclamped)
+   for the meter and shows `fps · frameMs` in the HUD; the sim still
+   advances on the clamped `dtWall`.
+2. **The quality tiers did not reduce the dominant cost.** The
+   fragment-fetch model at 1919×998 (1.91M visible px), from the
+   measured coverages: before = 56.1M fetches/frame — scene render
+   into postRT 16.6M (woman plate alone 9.6M: full-frame quad × 5-tap
+   CAS, but the woman covers only 25% of it), street 9.6M (water
+   heightfield 5 fetches + steam 4.6M), emissive 5.7M (5 fetches on a
+   mostly-black mask), noren strips 0.5M, lantern plates ~1.5M
+   invocations for ~0.05M covered px, and the post quad 38.3M — the
+   single biggest cost, because `antialias: true` made the browser
+   run the post pass at 4× MSAA (5 fetches × 4). `applyRenderScale`
+   only shrank the drawing buffer and postRT — at 0.5× it cut fetches
+   to 19.5M, but the post pass was still 4× MSAA'd, and the auto
+   evaluator had no way to show it had stepped down (the select only
+   ever displayed the mode "畫質：自動"), so "Auto never stepped
+   down" was also unverifiable from the outside. The CPU side is
+   innocent: sim 3600 steps ≈ 1.2–1.8 s wall (~33× real time),
+   `waterStep` on the 32×32 grid ≈ 0.001 ms/step, zero per-frame
+   texture uploads (all 9 textures are static; water is a 4 KB
+   DataTexture upload per frame) — the bottleneck is fragment fill
+   in software rasterization, not JS.
+   Fixes, all verified by the fragment model in
+   `test/slices.test.py` (computed from the real layer PNGs):
+   - `antialias: false` — the scene render into postRT was never
+     multisampled (render targets don't inherit canvas MSAA), so
+     only the post quad changes; post goes 38.3M → 9.6M fetches.
+   - Woman shader discards fully transparent fragments BEFORE the
+     4 CAS neighbour fetches (`if (c.a < 0.02) discard;`) — saves
+     ~5.7M fetches/frame at 1919×998 (75% of the plate is
+     transparent). Visually identical: alpha < 0.02 blends to
+     nothing anyway.
+   - Lantern plates (layer1/layer3) get `alphaTest: 0.02` — their
+     ~97–99% transparent pixels skip blending. Honest limit: an
+     alpha test discards AFTER the texture fetch, so this saves
+     blend/overdraw cost, not fetches; the fetch saving is the
+     woman discard above.
+   - Cheap post at the lowest tier (`uCheap` uniform): a single
+     fetch, no 5-tap CAS, no heat-haze — the low tier must be
+     cheaper in fragments, not just in resolution. Flash, curtain,
+     vignette and sRGB still apply.
+   - Auto now shows the ACTIVE tier: `applyRenderScale(next, true)`
+     rewrites the Auto option label to e.g. "畫質：自動 → 低 0.5×"
+     and toasts on a step-down.
+   Model result: 21.7M fetches/frame at high/mid tier (39% of
+   before), 14.0M at the low tier (25% of before). **This is a
+   fragment model, not a measured fps gain** — the cloud browser's
+   software rasterizer cannot be reproduced on this VM, and desktop
+   60 fps is NOT claimed. Live E2E must measure the real fps.
+3. **Sliders — no app bug.** The round-1 re-test saw no pointer
+   response, but the wiring is a plain native `<input type=range>`
+   + `input` listener, the panel sits above the canvas at z-index
+   10 with no `pointer-events` block, and keyboard control works —
+   the non-response is a synthetic-input artifact of the test
+   harness. Belt-and-braces: sliders now also listen for `change`
+   (pointer commit) and every label carries `for` so clicking a
+   label focuses its slider. Live E2E must confirm pointer-drag on
+   a real mouse.
+4. **layer3 toggle — no bug.** The front lantern PNG was viewed
+   directly (a large red paper lantern, top-left of the frame) and
+   the toggle is wired to the right mesh (`setLayerVisible('layer3')`
+   hides the lantern group); at 4 fps with a mostly-static scene
+   the change is subtle in stills. Live E2E must confirm it hides
+   the lantern visibly.
+
+### Part B — lo-fi playlist (user chose real tracks 2026-11-20)
+
+6 tracks from Free Music Archive, all **CC BY 4.0**, downloaded and
+verified 2026-11-20 (ffprobe + full decode, zero errors):
+`01-kyoto-1000-handz.mp3` (Kyoto, 1000 Handz, 2:36),
+`02-shanghai-1000-handz.mp3` (Shanghai, 1000 Handz, 2:07),
+`03-shatter-1000-handz.mp3` (Shatter, 1000 Handz, 2:40),
+`04-silent-wood-purrple-cat.mp3` (Silent Wood, Purrple Cat, 3:08),
+`05-long-day-purrple-cat.mp3` (Long Day, Purrple Cat, 3:05),
+`06-through-the-trees-purrple-cat.mp3` (Through the Trees, Purrple
+Cat, 3:12). Total 24,221,540 bytes (~24 MB), 16:49. License record
+with source URLs and exact attribution text:
+`assets/music/README.md`. **In-app attribution is a license
+requirement, not decoration** — the playing track's attribution line
+is shown in the music panel; no attribution = license violation.
+Pixabay Music was blocked (Cloudflare bot challenge + runtime fetch
+policy); FMA was the source that worked.
+
+Built: a Music panel in the HUD (🎵 button in the control panel;
+the old 📻 Lo-Fi button moved inside it). Track list (title —
+artist + duration); tap a track to play it; play/pause, prev/next
+buttons; auto-advance on `ended`, wrapping at the end; current-track
+display; volume slider. Playback via `<audio>` + Web Audio
+`MediaElementSource` through a new `AudioEngine.nodes.music` bus
+(music gain → master), so the audio on/off switch mutes music with
+the ambience and the volume slider controls it. The generative
+Kitchen Lo-Fi Radio stays as a separate "合成" option in the same
+panel (its chord pad now also routes through the music bus, not
+straight to master); playlist and radio are mutually exclusive —
+starting one stops the other. Pressing play on a track turns the
+master audio on (an explicit request to hear music); auto-advance
+does NOT re-enable audio if the user muted. **No preloading:** the
+element has `preload = 'none'` and `src` is set only when a track
+is played (24 MB is never fetched on page load). Rain ambience stays
+independent. The "no audio files in repo" rule now carries an
+explicit exception (this playlist, CC BY 4.0, in-app attribution) —
+recorded here, in `CLAUDE.md`, and in `assets/music/README.md`.
+
+Tests added in this round: playlist manifest match (6 files on disk,
+>1 MB each, durations sum to 1008 s listed / 16:49 precise,
+attribution contains artist + CC BY 4.0 + license link for every
+track), `playlistNext`/`playlistPrev` wrap, fps-meter raw-dt,
+quality-tier fragment reduction + Auto tier label, slider `change`
++ label `for`, playlist UI wiring (panel/radio placement, track
+list from PLAYLIST, `ended` → `playlistNext`, attribution follows
+the playing track, `preload = 'none'`, single `src` assignment,
+music bus + `createMediaElementSource`, radio through the music
+bus). Full suite after the round: **40/40 JS tests + all Python
+slice tests pass** (incl. the fragment model: 21.7M vs 56.1M high/mid,
+14.0M vs 56.1M low tier).
+
+### Live E2E still to check for this round (do NOT close it without this)
+
+- fps on a real GPU (cloud browser is software WebGL — note the
+  reading), and whether Auto visibly steps the tier down at 4 fps
+  (the select label + toast) and Low actually improves fps.
+- Slider pointer-drag on a real mouse (keyboard worked; synthetic
+  pointer did not).
+- layer3 toggle hides the front lantern visibly.
+- Playlist: tap a track → plays; prev/next wrap; auto-advance on
+  track end; volume slider; attribution line visible for the playing
+  track; radio still works and is labelled 合成; no 24 MB preload
+  on page load (network check).
+- Mobile ~390 px (not testable in the cloud browser; do not claim
+  mobile works).
+- Re-check the round-1 fixes (rest alignment, parallax, depth,
+  interactions, presets, shortcuts, H) still hold.
 
