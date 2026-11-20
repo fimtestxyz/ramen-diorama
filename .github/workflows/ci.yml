@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax-check JS files
+        run: |
+          shopt -s globstar nullglob
+          files=(scripts/**/*.js scripts/**/*.mjs test/**/*.mjs)
+          if [ ${#files[@]} -gt 0 ]; then
+            for f in "${files[@]}"; do node --check "$f"; done
+          else
+            echo "no JS files yet"
+          fi
+      - name: Syntax-check Python scripts
+        run: |
+          shopt -s nullglob
+          files=(scripts/*.py)
+          if [ ${#files[@]} -gt 0 ]; then
+            python3 -m py_compile "${files[@]}"
+          else
+            echo "no Python scripts yet"
+          fi
+      - name: Run tests
+        run: |
+          if [ -d test ] && ls test/*.test.mjs >/dev/null 2>&1; then
+            node --test test/*.test.mjs
+          else
+            echo "no tests yet"
+          fi
+      - name: Check source art exists
+        run: test -f assets/source-art.png
