@@ -51,5 +51,13 @@ jobs:
           else
             echo "no slice tests yet"
           fi
+      - name: Run scene tests (Python)
+        run: |
+          if [ -f test/scenes.test.py ]; then
+            pip install --quiet numpy Pillow
+            python3 test/scenes.test.py
+          else
+            echo "no scene tests yet"
+          fi
       - name: Check source art exists
         run: test -f assets/source-art.png
