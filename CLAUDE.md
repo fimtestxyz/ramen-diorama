@@ -99,6 +99,46 @@ Faithful to the Shinya Ramen showcase spec, built in one pass.
 - three.js CDN: `browser.open` of the jsDelivr URL failed; the pin was
   verified via the npm registry instead. Do not re-attempt that fetch.
 
+## Fix round 1 lessons (2026-11-20, live E2E failures)
+
+- Strip y convention: frame pixel (fx, fy) maps to plane-local
+  ((fx/1920−0.5)·PLANE_W·s, (0.5−fy/1080)·PLANE_H·s). Texture-v is the
+  opposite sense (v = 1 − fy/1080, from the bottom) — using `(0.5 − v)`
+  for the y position mirrors the strip. The head-pivot/eye coords use
+  the inverse mapping and are correct; do not "fix" them the same way.
+- Overlays must be registered for parallax: anything that is not in
+  `plates` never moves. The emissive and street overlays were invisible
+  to `syncScene` and ghosted against their plates. The emissive overlay
+  shifts with the backdrop depth (−0.36), not its own z (0.5).
+- Lantern groups shift, not their meshes: the mesh inside a lantern
+  group carries the pivot offset in its position; the plates loop must
+  skip lantern meshes (`userData.lantern`) and `syncScene` shifts the
+  group from `userData.baseX/baseY/z`.
+- `coversFrame` must use the viewport aspect: the visible half-width is
+  (PLANE_H/2) × aspect, not PLANE_W/2. Overscan 1.18 covers full
+  deflection at 16:9 (margin 0.041) but not at aspect 1.923 (needs
+  1.239); `parallaxScaleFor(aspect)` scales the shift instead of the
+  geometry, so rest alignment is untouched.
+- The water grid is bottom-origin: the street shader and both water
+  textures read row 0 at the frame bottom; every splash y (rain, drips,
+  taps) must be flipped (`1 − (land − 0.65) / 0.35`). `classifyTap`
+  is the single source of truth for tap regions.
+- transformers.js v3 is ESM-only: `dist/transformers.min.js` ends with a
+  bare `export{...}` and exposes no `Transformers` global — never
+  `importScripts` it, never read a global. The depth worker is a module
+  worker importing `{ pipeline, env, RawImage }` from the package root.
+  Surface the real worker error in the status line; a generic "載入失敗"
+  is undiagnosable.
+- H must toggle one body class (`hud-hidden`), never per-element
+  `hidden` — per-element toggling inverts each panel's own state.
+- Adaptive quality: `qualityTierFor(fps, scale)` (1 / 0.75 / 0.5,
+  down < 22 fps, up > 50 fps), `applyRenderScale` resizes renderer +
+  postRT + `uRes`. The sim is cheap; GPU fill at full resolution is
+  the cost on weak GPUs.
+- CI must name `test/smoke.mjs` explicitly: the shell glob
+  `test/*.test.mjs` never matched it, so the smoke suite (incl. the
+  index.html structural checks) was never run by CI.
+
 ## Push rules (repo-wide, learned 2026-11-18)
 
 - The Muse GitHub App pushes ordinary files fine (installation is

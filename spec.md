@@ -233,7 +233,144 @@
 - Performance: `waterImpulse` now iterates only the impulse disc's
   bounding box instead of the whole grid (same result, ~40× less work).
 - CI (`.github/workflows/ci.yml`) runs `node --check` on scripts/tests,
-  `node --test test/*.test.mjs`, the Python slice tests, and the
-  source-art existence check. Note: `node --check` on the inline
+  `node --test test/*.test.mjs test/smoke.mjs`, the Python slice tests,
+  and the source-art existence check. Note: `node --check` on the inline
   `index.html` script blocks is covered by `test/smoke.mjs`, which
-  extracts and checks them.
+  extracts and checks them. (Round 1 fix: the CI glob used to be only
+  `test/*.test.mjs`, which never matched `test/smoke.mjs` — the smoke
+  suite was never run by CI until this fix.)
+
+## Fix round 1 (2026-11-20, local only — not yet pushed or live-verified)
+
+Live E2E 2026-11-20 13:53–14:10 (cloud browser, 1919×998, software
+WebGL) returned NOT SHIPPABLE. Every failure below was diagnosed from
+the code first (verified, not guessed), then fixed, then covered by a
+regression test. Nothing in this round was verified in a live browser.
+
+1. **Rest alignment — noren strips vertically flipped.** `buildNorenStrips`
+   placed strips at y = `(0.5 - v) * PLANE_H * s` with `v = 1 - fy/1080`
+   (texture-v, from the bottom) — that equals `-(0.5 - fy/1080)`, the
+   negative of the correct frame-fraction-from-top value. Measured: rod
+   (fy=55) landed at y = −0.898 (below centre), hem (fy=730) at +0.352
+   (above centre) — the cloth rendered upside-down and displaced, while
+   the real noren area showed the punched-out static plate (inpainted
+   wood with seams). The layer PNGs were NOT the problem: viewed
+   directly, `layer2-noren.png` reads "深夜ラーメン" correctly, and the
+   static-plate punch was verified numerically (alpha 0 inside the
+   panels). The `plateGeometry` UV remap itself is correct
+   (uvInset u0=0.0763, u1=0.9237; geometry u=0 → tex 0, u=1 → tex 1).
+   Fix: strip y is now `(0.5 - fy / 1080) * PLANE_H * s` (rod +0.898,
+   hem −0.352). The head-pivot/eye coords use the inverse mapping and
+   were already right.
+2. **Parallax gaps — three compounding causes.**
+   (a) `coversFrame` ignored viewport aspect: it compared against
+   `PLANE_W/2` (1.7778), but the camera fov is set from the height, so
+   the visible half-width is `(PLANE_H/2) × aspect`. At the E2E viewport
+   (aspect 1.923) the visible half-width is 1.923 and the max apparent
+   plate shift is 0.279, so the required overscan is 1.239 — but
+   OVERSCAN is 1.18, leaving a real ~0.104-world-unit gap at the frame
+   edge at full deflection. (At 16:9, 1.18 suffices, margin 0.041.)
+   The build's overscan change 1.036 → 1.18 "consistent with the zoom
+   clamp" was a conflation: zoom clamp ≠ parallax coverage.
+   (b) The emissive overlay (z=0.5) and street overlay (z=−0.359) were
+   never registered in `plates`, so `syncScene` never shifted them —
+   they stayed fixed while the plates moved, so the OPEN glow
+   misaligned with the OPEN sign (ghost/duplicate) and the street
+   reflection misaligned with the street. Both are now registered;
+   the emissive overlay shifts with the backdrop depth (z=−0.36, where
+   most signs live) rather than its own z=0.5, which would over-shift it.
+   (c) The lantern plates' pivot offset was clobbered by `syncScene`'s
+   plates loop: `buildLanterns` re-parents layer1/layer3 meshes into
+   groups with `mesh.position.set(-local.x, -local.y, 0)`, but the loop
+   read `mesh.position.z` (now 0, so shift = 0) and overwrote
+   `mesh.position.x/y` every frame — the lantern plates were displaced
+   by a full pivot offset (front lantern local ≈ (−0.915, +0.96)) and
+   rendered off-frame; only their glow (from the fixed emissive
+   overlay) remained visible. Fix: lantern groups carry
+   `userData.baseX/baseY/z`, meshes are marked `userData.lantern` and
+   skipped in the plates loop, and `syncScene` shifts the groups.
+   Fix for (a): new `parallaxScaleFor(aspect)` — 1 at 16:9 and narrower,
+   ~0.627 at aspect 1.923, 0 where even rest coverage fails. The shift
+   is scaled, never the geometry, so rest alignment is untouched. The
+   invariant is tested: at the clamped scale every layer covers at
+   every aspect where rest coverage is possible (0.5, 1.0, 16:9, 1.923).
+   Steam planes and mist now shift with their plates too (bowl steam
+   with layer4 z=0.34, mist with z=−0.2); rain lines stay unshifted
+   (full-frame weather).
+3. **Live depth model — `dist/transformers.min.js` in
+   @huggingface/transformers@3.7.2 is an ESM bundle, not a classic
+   script.** Verified against the published tarball (10,377,577 bytes):
+   the file ends with a bare `export{...}` and the string "Transformers"
+   appears 0 times in it — it exposes NO global. The worker's
+   `importScripts(...)` therefore threw a SyntaxError at worker
+   evaluation (uncaught → `depthWorker.onerror` → "深度模型載入失敗"),
+   failing in <2 s with no model download — exactly the E2E symptom.
+   Even if importScripts had worked, `Transformers.pipeline` would have
+   thrown ReferenceError. Fix: the worker is now a module worker
+   (`new Worker(blobUrl, { type: 'module' })`) importing
+   `{ pipeline, env, RawImage }` from the package root — the documented
+   v3 browser pattern, the same one the paulkinlan demo that worked
+   uses. `onerror` and the 'error' message now surface the real error
+   text in the status line instead of the generic message.
+4. **Water flip — the heightfield is bottom-origin in the shader but
+   top-origin in the sim.** The street shader samples the water at
+   `huv.y = tuv.y/0.352` where tuv.y is the frame fraction from the
+   bottom; both the GPU render target and the CPU DataTexture read row 0
+   at the frame bottom. But `stepRain` splashes, drip splashes, and
+   street taps all used top-origin y — every splash rendered at the
+   mirror-y position inside the street band. Fix: all splash y values
+   flipped to bottom-origin (`1 - (land - 0.65) / 0.35` etc.); the tap
+   mapping now lives in pure `RamenLogic.classifyTap` (tested: neon
+   boxes, noren panels 0–5, lantern circles, steam rect, street fx/fy
+   with the flip, none). This alone does not explain "no ripple
+   observed" — the wiring is intact by inspection, and the E2E's street
+   clicks may have missed the street region (one receipted click was at
+   (1670,825), the counter) plus 4 fps makes a ~1 s transient easy to
+   miss in stills — so feedback was made persistent (see 5).
+5. **Interactions — splash/steam feedback was too weak/transient, and
+   drag-brushing did not exist.** Steam `uSwirl` was a binary 0/1 offset
+   of the noise domain set from `state.brush.active` for ANY pointer-down
+   anywhere — a one-time pattern shift, not a visible swirl. Noren drag:
+   `pointermove` only called `updatePointer`; only the initial tap
+   applied a brush impulse — dragging across the curtains never brushed
+   them. Fixes: `createSim` gains `rings: []`, `swirl: 0`,
+   `swirlAng: 0`; `addRing` (cap 4, expire >3 s, drawn as expanding
+   bright rings in the street shader via `uRings[4]`) and `addSwirl`
+   (accumulates the drag angle, decays); a street tap now also drops a
+   ring + toast "水花！" + audio blip; a drag over the noren brushes it
+   (throttled by panel change / ~90 ms); a circular drag over the bowl
+   steam rotates the steam noise domain by the accumulated angle
+   (`uSwirlAng` uniform). `handleTap` is now a thin switch over
+   `classifyTap`; neon spark behaviour is unchanged.
+6. **H hides the inspector — per-element toggle bug.** H toggled
+   `hidden` on every `.hud` element independently, so a panel that was
+   already hidden (e.g. the closed inspector) got UNHIDDEN by H. Fix:
+   one `toggleHud()` used by both H and the Hide button, toggling
+   `document.body.classList.toggle('hud-hidden')`, plus CSS
+   `body.hud-hidden .hud:not(#toast){display:none!important}` — the
+   toast stays visible because it is transient feedback, not HUD chrome;
+   individual panel states are untouched, so pressing H again restores
+   exactly the previous visibility.
+7. **Performance — 4 fps in the cloud browser (software WebGL, no GPU).**
+   The sim is cheap (measured ~33× real time); the cost is GPU fill at
+   full resolution (full-res scene render into postRT + full-screen post
+   pass with 5-tap CAS, at 1920×998, `setPixelRatio(min(dpr,2))`).
+   Fix: adaptive render quality — pure `qualityTierFor(fps, scale)`
+   (tiers 1 / 0.75 / 0.5, step down if fps < 22, up only if fps > 50),
+   evaluated every 2 s in auto mode; `applyRenderScale` resizes the
+   renderer + postRT + `uRes`; a manual quality `<select>` in the HUD
+   (Auto/高/中/低) overrides auto until Auto is picked again. Fill cost
+   at 0.5× scale is 25% of full. Measured fps before = 4 (E2E, software
+   WebGL); after = unknown until live E2E — desktop 60 fps is NOT
+   claimed.
+
+Tests added in this round (all in `test/logic.test.mjs` +
+`test/smoke.mjs`): `coversFrame` aspect + `parallaxScaleFor` invariant,
+`classifyTap` regions, water bottom-origin row, ring persistence/expiry,
+swirl accumulate/decay, `qualityTierFor`, noren strip formula, lantern
+group shift, overlay/steam registration, depth-worker module shape,
+H body-class + rings + swirl wiring. Full suite after the round:
+**34/34 JS tests + all Python slice tests pass.** The rain splash-y
+assertion was updated to the flipped convention (it failed first, as
+expected — the flip changed the contract).
+

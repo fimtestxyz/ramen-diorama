@@ -172,3 +172,64 @@ test('structure: HUD controls referenced in JS exist in the HTML', () => {
     assert.ok(html.includes(`id="${id}"`), `missing element id="${id}"`);
   }
 });
+
+/* ------------------------------------------------------------------ */
+/* Fix round 1 — structural regressions for the 2026-11-20 live E2E    */
+/* ------------------------------------------------------------------ */
+
+test('round 1: noren strips are right-side up (rod above hem)', () => {
+  // The strip grid maps frame pixel (fx, fy) to plane-local
+  // ((fx/1920-0.5)*PLANE_W*s, (0.5-fy/1080)*PLANE_H*s). The old code
+  // used (0.5 - v) with v = 1 - fy/1080 — the negative of that — so
+  // the noren rendered upside-down and displaced. Assert the fixed
+  // expression is what the shipped code uses, and check the invariant.
+  const m = html.match(/pos\.push\(\(u - 0\.5\) \* L\.PLANE_W \* s, ([^,]+), 0\)/);
+  assert.ok(m, 'strip position expression found');
+  assert.ok(m[1].includes('fy / 1080'), `strip y uses the frame fraction: ${m[1]}`);
+  assert.ok(!m[1].includes('(0.5 - v)'), 'strip y must not use the texture-v');
+  const y = (fy) => (0.5 - fy / 1080);
+  assert.ok(y(55) > y(730), 'rod (fy=55) sits above hem (fy=730)');
+});
+
+test('round 1: lantern plates are shifted by their groups, not clobbered', () => {
+  // buildLanterns stores the pivot as group.userData.baseX/baseY and
+  // marks the mesh; syncScene must skip lantern meshes in the plates
+  // loop and shift the groups instead — the old code overwrote the
+  // mesh position every frame, displacing the lantern plates off-frame.
+  assert.ok(html.includes('mesh.userData.lantern = true'), 'lantern mesh marked');
+  assert.ok(html.includes('if (mesh.userData.lantern) continue;'), 'plates loop skips lantern meshes');
+  assert.ok(html.includes('g.position.x = g.userData.baseX + sh.x'), 'group shifted by base + parallax');
+  assert.ok(html.includes('g.position.y = g.userData.baseY + sh.y'), 'group shifted vertically too');
+});
+
+test('round 1: overlays and steam follow parallax', () => {
+  assert.ok(html.includes("plates['street'] = mesh"), 'street overlay registered in plates');
+  assert.ok(html.includes("plates['emissive'] = mesh"), 'emissive overlay registered in plates');
+  assert.ok(html.includes('mesh.userData.shiftZ = -0.36'), 'emissive shifts with the backdrop depth');
+  assert.ok(html.includes('steamMeshes.push(mesh)'), 'steam planes tracked for parallax');
+  assert.ok(html.includes('L.parallaxScaleFor(camera.aspect)'), 'parallax is aspect-scaled at runtime');
+});
+
+test('round 1: depth worker is a module worker (transformers v3 is ESM-only)', () => {
+  // dist/transformers.min.js@3.7.2 ends with a bare export{...} and
+  // exposes no global; importScripts of it throws a SyntaxError, which
+  // is exactly the <2s "深度模型載入失敗" seen live. Assert the shipped
+  // worker imports the ESM entry as a module worker.
+  const m = html.match(/const workerSrc = `([\s\S]*?)`;/);
+  assert.ok(m, 'worker source found');
+  assert.ok(m[1].includes("import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2'"),
+    'worker imports the ESM entry');
+  assert.ok(!m[1].includes('importScripts'), 'no importScripts of the ESM bundle');
+  assert.ok(!m[1].includes('Transformers.'), 'no (nonexistent) Transformers global');
+  assert.ok(html.includes("{ type: 'module' }"), 'worker created as a module worker');
+});
+
+test('round 1: H hides all HUD chrome via one body class; rings + swirl wired', () => {
+  assert.ok(html.includes("document.body.classList.toggle('hud-hidden')"), 'H toggles the body class');
+  assert.ok(html.includes('body.hud-hidden .hud:not(#toast)'), 'CSS hides HUD chrome except the toast');
+  assert.ok(html.includes('uniform vec4 uRings[4]'), 'street shader declares the ring uniforms');
+  assert.ok(html.includes('uSwirlAng'), 'steam shader has a swirl-angle uniform');
+  assert.ok(html.includes('id="sel-quality"'), 'quality select exists in the HUD');
+  assert.ok(html.includes('L.addRing(state.sim, fx, fy, 1.2)'), 'street tap adds a splash ring');
+  assert.ok(html.includes('L.addSwirl(state.sim, d)'), 'steam drag accumulates swirl');
+});

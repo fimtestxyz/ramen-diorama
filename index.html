@@ -96,6 +96,13 @@
   #curtain.on { display: block; }
 
   /* ---------- Toast / loading ---------- */
+  /* Round 1 fix: H used to toggle the 'hidden' class on every .hud
+     element independently, so a panel that was already closed (e.g. the
+     inspector) got OPENED by H, and the inspector stayed visible while
+     the rest hid. H now toggles one body class that hides all HUD
+     chrome at once; each panel keeps its own state underneath. The
+     toast is exempt — it is transient feedback, not chrome. */
+  body.hud-hidden .hud:not(#toast) { display: none !important; }
   #toast {
     left: 50%; bottom: 84px; transform: translateX(-50%);
     padding: 9px 16px; font-size: 13px; z-index: 20; max-width: 92vw;
@@ -170,6 +177,12 @@
   <button class="btn" id="btn-compare" title="對比原圖 (C)">◐ 對比</button>
   <button class="btn" id="btn-inspector" title="圖層檢查器 (D)">▦ 檢查</button>
   <button class="btn" id="btn-hide" title="隱藏介面 (H)">隱藏</button>
+  <select class="btn" id="sel-quality" title="畫質：自動會在卡頓時降級">
+    <option value="auto" selected>畫質：自動</option>
+    <option value="1">畫質：高</option>
+    <option value="0.75">畫質：中</option>
+    <option value="0.5">畫質：低</option>
+  </select>
 </div>
 
 <div id="presets" class="hud">
@@ -272,17 +285,55 @@
     var h = 0.5 / OVERSCAN;
     return { u0: 0.5 - h, u1: 0.5 + h };
   }
-  /* Does the backdrop plane still cover the whole frame at this parallax?
-     Apparent half-width of the backdrop plane is PLANE_W/2 * OVERSCAN
+  /* Does the plate at depth z still cover the whole frame at this
+     parallax? Apparent half-width of the plate is PLANE_W/2 * OVERSCAN
      (perspective cancels the (d-z)/d scale); its apparent shift is
-     shift * d/(d-z). */
-  function coversFrame(z, px, py) {
+     shift * d/(d-z). The visible half-width depends on the viewport
+     aspect (the camera fov is set from the height, so the visible width
+     is PLANE_H * aspect): the old version compared against PLANE_W/2,
+     which is only right for a 16:9 viewport. On a wider viewport
+     (the live E2E window was 1919x998, aspect 1.923) the plates fall
+     short at full deflection and the frame edge shows the page
+     background. aspect defaults to 16/9. */
+  function coversFrame(z, px, py, aspect) {
+    if (aspect == null) aspect = 16 / 9;
     var halfW = (PLANE_W / 2) * OVERSCAN;
     var halfH = (PLANE_H / 2) * OVERSCAN;
     var s = plateShift(z, px, py);
     var appX = Math.abs(s.x) * CAM_D / (CAM_D - z);
     var appY = Math.abs(s.y) * CAM_D / (CAM_D - z);
-    return (halfW - appX) >= PLANE_W / 2 && (halfH - appY) >= PLANE_H / 2;
+    var visHalfW = (PLANE_H / 2) * aspect;
+    return (halfW - appX) >= visHalfW && (halfH - appY) >= PLANE_H / 2;
+  }
+  /* Largest apparent (reference-plane) shift of any plate at full
+     pointer deflection, in world units. */
+  function maxApparentShift() {
+    var m = 0;
+    for (var i = 0; i < LAYERS.length; i++) {
+      var z = LAYERS[i].z;
+      var s = plateShift(z, 1, 0);
+      var a = Math.abs(s.x) * CAM_D / (CAM_D - z);
+      if (a > m) m = a;
+    }
+    return m;
+  }
+  /* Scale the pointer parallax (0..1) so the plates always cover the
+     frame for this viewport aspect. 1 at 16:9 and narrower (full spec
+     amplitude); smaller on wider viewports, where the fixed 1.18
+     overscan cannot cover full deflection. The shift is scaled, never
+     the plate geometry, so rest alignment is untouched. */
+  function parallaxScaleFor(aspect) {
+    var halfW = (PLANE_W / 2) * OVERSCAN;
+    var visHalfW = (PLANE_H / 2) * aspect;
+    return clamp((halfW - visHalfW) / maxApparentShift(), 0, 1);
+  }
+  /* Adaptive render-quality tier from measured fps (0.5 / 0.75 / 1.0
+     render scale). Hysteresis: step down promptly when slow, step up
+     only when comfortably fast, so the tier does not oscillate. */
+  function qualityTierFor(fps, scale) {
+    if (fps < 22 && scale > 0.5) return scale >= 1 ? 0.75 : 0.5;
+    if (fps > 50 && scale < 1) return scale <= 0.5 ? 0.75 : 1;
+    return scale;
   }
 
   /* ---- shallow-water PDE (CPU mirror of the GPU shader rule) ---- */
@@ -349,7 +400,14 @@
      (street occupies UV y 0.65..1.0, x 0..0.36 in the frame).
      Each drop has a landing y inside the band: it splashes when it reaches
      it, provided it is still over the band in x. Coordinates are
-     normalised to the water heightfield (x: /0.36, y: (land-0.65)/0.35). */
+     normalised to the water heightfield (x: /0.36, y: (land-0.65)/0.35).
+     WATER-GRID CONVENTION (fixed 2026-11-20, round 1): the heightfield
+     is BOTTOM-origin — row 0 is the frame bottom. The street shader
+     samples it at huv.y = (frame fraction from bottom)/0.352, and both
+     the GPU render target and the CPU DataTexture (flipY=false) read
+     row 0 at v=0, i.e. the frame bottom. Sim-space y is TOP-origin, so
+     it is flipped on entry here (and for drips and taps). Before the
+     fix every splash rendered at the mirror-y position in the street. */
   function stepRain(drops, active, dt, wind, rng) {
     var splashes = [];
     for (var i = 0; i < drops.length; i++) {
@@ -359,8 +417,9 @@
       d.x += (Math.tan(d.slant) * d.speed + wind * 0.06) * dt;
       if (d.y >= d.land) {
         if (d.x > 0.02 && d.x < 0.36) {
-          // Heightfield coords: x spans the street band (0..0.36), y the band (0.65..1.0).
-          splashes.push({ x: d.x / 0.36, y: (d.land - 0.65) / 0.35, amp: 0.5 + rng() * 0.5 });
+          // Heightfield coords: x spans the street band (0..0.36), y the band (0.65..1.0),
+          // flipped to bottom-origin (see convention above).
+          splashes.push({ x: d.x / 0.36, y: 1 - (d.land - 0.65) / 0.35, amp: 0.5 + rng() * 0.5 });
         }
         d.y = -0.02 - rng() * 0.05;
         d.x = rng() * 0.9;
@@ -407,6 +466,8 @@
         return { x: 0.05 + rng() * 0.28, y: 0.09 + rng() * 0.4, v: 0, wait: rng() * 2 };
       }),
       splashes: [],
+      rings: [], // tap splash rings {x, y, age, amp} in water-grid coords; last ~3s
+      swirl: 0, swirlAng: 0, // steam swirl strength (0..1) and accumulated twist (rad)
       events: {
         taxiAt: 16 + rng() * 10, lightningAt: 26 + rng() * 20,
         taxi: 0, lightning: 0, lightningEnv: 0
@@ -471,8 +532,10 @@
       dr.v += 2.2 * dt;
       dr.y += dr.v * dt;
       if (dr.y > 0.62) {
-        waterImpulse(sim.water.h, sim.water.n, dr.x / 0.36, 0.95, 0.9, 0.06);
-        sim.splashes.push({ x: dr.x / 0.36, y: 0.95, amp: 0.9 });
+        // Drip lands at the bottom of the street band: top-origin y 0.95
+        // flips to bottom-origin 0.05 (see the water-grid convention).
+        waterImpulse(sim.water.h, sim.water.n, dr.x / 0.36, 0.05, 0.9, 0.06);
+        sim.splashes.push({ x: dr.x / 0.36, y: 0.05, amp: 0.9 });
         dr.y = 0.09; dr.v = 0; dr.wait = 0.4 + rng() * 2.4;
         dr.x = 0.05 + rng() * 0.28;
       }
@@ -509,6 +572,14 @@
       if (S.spark < 0.01) S.spark = 0;
     }
 
+    /* tap splash rings: age and expire after 3s; steam swirl relaxes */
+    for (var ri = sim.rings.length - 1; ri >= 0; ri--) {
+      sim.rings[ri].age += dt;
+      if (sim.rings[ri].age > 3) sim.rings.splice(ri, 1);
+    }
+    sim.swirl *= Math.exp(-dt * 1.5);
+    sim.swirlAng *= Math.exp(-dt * 0.8);
+
     sim.steamPhase += dt;
   }
 
@@ -539,6 +610,46 @@
   function applySpark(sim, sign) {
     sim.signs[sign].spark = 1;
     sim.signs[sign].dip = 3;
+  }
+  /* Tap splash ring: a visible, lasting ring in the street shader so a
+     tap is observable even at low fps (the PDE ripple alone decays in
+     ~1s and is easy to miss in a still). Water-grid coords (bottom-origin). */
+  function addRing(sim, x, y, amp) {
+    sim.rings.push({ x: x, y: y, age: 0, amp: amp || 1 });
+    if (sim.rings.length > 4) sim.rings.shift();
+  }
+  /* Steam swirl: accumulate the drag angle around the bowl; strength
+     follows the drag and decays in stepSim so the steam untwists. */
+  function addSwirl(sim, dAng) {
+    sim.swirlAng += dAng;
+    sim.swirl = Math.min(1, sim.swirl + Math.abs(dAng) * 0.6);
+  }
+  /* Pure tap classification: frame pixels (1920x1080 space) -> what the
+     pointer hit. The app's handleTap is a thin switch over this, so the
+     mapping is unit-testable. Water coords are bottom-origin (see the
+     water-grid convention): a tap at the top of the street band
+     (py=700) maps to fy=1, at the bottom (py=1080) to fy=0. */
+  var TAP_SIGNS = [
+    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
+    [430, 560, 500, 740], [1500, 120, 1830, 230]
+  ];
+  function classifyTap(px, py) {
+    for (var i = 0; i < TAP_SIGNS.length; i++) {
+      var b = TAP_SIGNS[i];
+      if (px >= b[0] && px <= b[2] && py >= b[1] && py <= b[3]) {
+        return { kind: 'neon', sign: i };
+      }
+    }
+    if (px >= 785 && px <= 1295 && py >= 55 && py <= 730) {
+      return { kind: 'noren', panel: Math.min(5, Math.floor((px - 785) / (510 / 6))) };
+    }
+    if (Math.hypot(px - 445, py - 175) < 140) return { kind: 'lantern', which: 1 };
+    if (Math.hypot(px - 1405, py - 255) < 120) return { kind: 'lantern', which: 0 };
+    if (px >= 1330 && px <= 1690 && py >= 560 && py <= 885) return { kind: 'steam' };
+    if (px < 700 && py > 700) {
+      return { kind: 'street', fx: px / 1920 / 0.36, fy: 1 - (py - 700) / 380 };
+    }
+    return { kind: 'none' };
   }
   function blinkAmount(sim) { return blinkAmountAt(sim.blink.mode, sim.blink.t); }
 
@@ -605,7 +716,10 @@
     LAYERS: LAYERS, MOODS: MOODS, MAX_STEPS_PER_FRAME: MAX_STEPS_PER_FRAME,
     mulberry32: mulberry32, clamp: clamp,
     plateScale: plateScale, plateShift: plateShift, uvInset: uvInset,
-    coversFrame: coversFrame,
+    coversFrame: coversFrame, maxApparentShift: maxApparentShift,
+    parallaxScaleFor: parallaxScaleFor, qualityTierFor: qualityTierFor,
+    classifyTap: classifyTap, TAP_SIGNS: TAP_SIGNS,
+    addRing: addRing, addSwirl: addSwirl,
     waterStep: waterStep, waterImpulse: waterImpulse,
     blinkAmountAt: blinkAmountAt, makeRain: makeRain, stepRain: stepRain,
     nextEventDelay: nextEventDelay,
@@ -680,7 +794,7 @@ let norenStrips = [];   // 6 strip meshes
 let lanternGroups = []; // [rear, front]
 let water = null;       // { targetA, targetB, updateMat, ... } or CPU fallback
 let emissiveMat = null, streetMat = null, postMat = null, postScene = null, postCam = null;
-let rainLines = null, dripLines = null, steamMats = [], mistMat = null;
+let rainLines = null, dripLines = null, steamMats = [], steamMeshes = [], mistMat = null, mistMesh = null;
 let taxiGroup = null, flashQuad = null;
 let textures = {};
 
@@ -859,12 +973,19 @@ const NOISE_GLSL = /* glsl */`
   }
 `;
 const STEAM_FRAG = /* glsl */`
-  uniform float uTime, uAmount, uSwirl;
+  uniform float uTime, uAmount, uSwirl, uSwirlAng;
   uniform vec2 uSwirlDir;
   varying vec2 vUv;
   ${NOISE_GLSL}
   void main() {
     vec2 p = vUv * vec2(2.0, 3.0);
+    // Swirl (round 1): rotate the noise domain around its centre by the
+    // accumulated drag angle, so a circular drag visibly twists the
+    // steam. The old code only translated the domain by a constant
+    // offset while the pointer was down — a one-time jump, barely visible.
+    float ca = cos(uSwirlAng), sa = sin(uSwirlAng);
+    vec2 c0 = vec2(1.0, 1.5);
+    p = mat2(ca, -sa, sa, ca) * (p - c0) + c0;
     p.y += uTime * 0.25;
     p += uSwirlDir * uSwirl * 0.6;
     float n = fbm(p + vec2(0.0, -uTime * 0.35));
@@ -1010,17 +1131,25 @@ function buildNorenStrips() {
       const yB0 = p.yBot0 + (p.yBot1 - p.yBot0) * f0;
       const yB1 = p.yBot0 + (p.yBot1 - p.yBot0) * f1;
       // Grid 13 x 9 in plane-local coords (frame fractions -> local).
+      // NOTE (round 1 fix): the plane's y uses the FRAME fraction from
+      // the top, (0.5 - fy/1080). The texture-v is v = 1 - fy/1080
+      // (from the bottom). The old code used (0.5 - v) for the position,
+      // which is the NEGATIVE of the right value: every strip was
+      // vertically mirrored about the plane centre, so the noren hung
+      // upside-down in the lower half of the frame while the real
+      // noren area showed the punched-out static plate (inpainted wood
+      // with vertical seams) and the text read mirrored.
       const cols = 13, rows = 9;
       const pos = [], uvArr = [], idx = [];
       for (let r = 0; r < rows; r++) {
-        const vr = r / (rows - 1); // 0 = bottom, 1 = top
+        const vr = r / (rows - 1); // 0 = hem (bottom of cloth), 1 = rod (top)
         for (let c = 0; c < cols; c++) {
           const fc = c / (cols - 1);
           const fx = x0 + (x1 - x0) * fc;
           const yBot = yB0 + (yB1 - yB0) * fc;
           const fy = yBot + (p.yTop - yBot) * vr;
           const u = fx / 1920, v = 1 - fy / 1080;
-          pos.push((u - 0.5) * L.PLANE_W * s, (0.5 - v) * L.PLANE_H * s, 0);
+          pos.push((u - 0.5) * L.PLANE_W * s, (0.5 - fy / 1080) * L.PLANE_H * s, 0);
           // Texture uv = frame fraction (layer2 is a full-frame texture).
           uvArr.push(u, v);
         }
@@ -1075,6 +1204,16 @@ function buildLanterns() {
     mesh.position.set(-local.x, -local.y, 0);
     group.add(mesh);
     group.userData.layerId = d.id;
+    // Round 1 fix: the parallax loop used to overwrite mesh.position.x/y
+    // every frame, clobbering the (-local.x, -local.y) pivot offset (and
+    // reading position.z = 0, so the shift was 0 too) — the lantern
+    // plates were displaced by a full pivot offset, off-frame. The loop
+    // now skips lantern meshes (marked here) and shifts the GROUP
+    // instead; the base pivot is stored for that.
+    group.userData.baseX = local.x;
+    group.userData.baseY = local.y;
+    group.userData.z = d.z;
+    mesh.userData.lantern = true;
     scene.add(group);
     lanternGroups.push(group);
   }
@@ -1154,6 +1293,7 @@ const STREET_FRAG = /* glsl */`
   uniform sampler2D uCpuWaterTex;
   uniform vec2 uCpuTexel;
   uniform vec2 uInset;
+  uniform vec4 uRings[4]; // tap splash rings: x, y (water-grid coords), age (s), amp
   varying vec2 vUv;    // raw frame fraction [0,1]
   void main() {
     // Texture UVs: vUv is the geometry uv; the frame fraction is
@@ -1181,6 +1321,18 @@ const STREET_FRAG = /* glsl */`
     vec3 refl = bg * (1.0 + em * (1.2 + 0.8 * uFlicker) * (1.0 - 0.7 * uBrownout));
     refl += vec3(0.10, 0.13, 0.20); // wet sky sheen
     vec3 col = mix(bg * 0.55, refl, 0.75);
+    // Tap splash rings: expanding bright rings that last ~3s, so a tap
+    // stays observable even at low fps (the PDE ripple alone is gone
+    // in ~1s). Ring coords are the same water-grid coords as huv.
+    for (int i = 0; i < 4; i++) {
+      vec4 rg = uRings[i];
+      if (rg.w > 0.001) {
+        float rad = 0.03 + rg.z * 0.09;
+        float d = distance(huv, rg.xy);
+        float band = exp(-pow((d - rad) / 0.012, 2.0));
+        col += vec3(0.75, 0.85, 1.0) * band * rg.w * max(0.0, 1.0 - rg.z / 3.0);
+      }
+    }
     gl_FragColor = vec4(col, street * 0.85);
   }
 `;
@@ -1214,6 +1366,7 @@ function buildStreet() {
       uCpuWaterTex: { value: null },
       uCpuTexel: { value: new THREE.Vector2(1 / 32, 1 / 32) },
       uInset: { value: new THREE.Vector2(inset.u0, inset.u1) },
+      uRings: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
     },
     vertexShader: STREET_VERT,
     fragmentShader: STREET_FRAG,
@@ -1222,7 +1375,13 @@ function buildStreet() {
   const mesh = new THREE.Mesh(g, streetMat);
   mesh.position.z = z;
   mesh.renderOrder = 1;
+  mesh.userData.layerId = 'street';
   scene.add(mesh);
+  // Round 1 fix: the street overlay was never shifted with the plates,
+  // so its reflection drifted away from the street under any parallax
+  // (including the idle cinematic drift). Registered in plates so it
+  // shifts with the backdrop depth.
+  plates['street'] = mesh;
 }
 
 /* ---------- emissive overlay (neon glow, per-sign flicker) ---------- */
@@ -1294,7 +1453,15 @@ function buildEmissive() {
   const mesh = new THREE.Mesh(plateGeometry(0.5, 0, 1, 0, 1), emissiveMat);
   mesh.position.z = 0.5;
   mesh.renderOrder = 8;
+  mesh.userData.layerId = 'emissive';
+  // Round 1 fix: the glow overlay was never shifted with the plates, so
+  // the neon glow stayed fixed while the signs moved under parallax
+  // (including the idle drift) — the OPEN sign looked ghosted/duplicated.
+  // It shifts with the backdrop depth (z = -0.36), where most signs
+  // live; its own z (0.5) would over-shift it. See syncScene.
+  mesh.userData.shiftZ = -0.36;
   scene.add(mesh);
+  plates['emissive'] = mesh;
   emissiveMat.userData.mesh = mesh;
 }
 
@@ -1372,30 +1539,41 @@ function buildSteamMist() {
   const mkSteam = (wFrac, hFrac, cxU, cyV) => {
     const w = L.PLANE_W * wFrac * s, h = L.PLANE_H * hFrac * s;
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uAmount: { value: 0.5 }, uSwirl: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(0, 0) } },
+      uniforms: { uTime: { value: 0 }, uAmount: { value: 0.5 }, uSwirl: { value: 0 }, uSwirlAng: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(0, 0) } },
       vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
       transparent: true, depthWrite: false,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     mesh.position.set((cxU - 0.5) * L.PLANE_W * s, (0.5 - cyV) * L.PLANE_H * s, 0.36);
     mesh.renderOrder = 7;
+    // Round 1 fix: the steam planes never shifted with the plates, so
+    // the steam detached from the bowl under parallax. Store the base
+    // position; syncScene shifts them with the woman plate (z = 0.34).
+    mesh.userData.baseX = mesh.position.x;
+    mesh.userData.baseY = mesh.position.y;
+    mesh.userData.shiftZ = 0.34;
     scene.add(mesh);
     steamMats.push(mat);
+    steamMeshes.push(mesh);
     return mesh;
   };
   mkSteam(0.16, 0.30, bowlU, bowlV - 0.14);  // bowl steam
   mkSteam(0.10, 0.18, 0.60, 0.55);           // pot / interior steam
   // Alley mist: wide soft plane over the street.
   const mistMat2 = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uAmount: { value: 0.16 }, uSwirl: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(1, 0) } },
+    uniforms: { uTime: { value: 0 }, uAmount: { value: 0.16 }, uSwirl: { value: 0 }, uSwirlAng: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(1, 0) } },
     vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
     transparent: true, depthWrite: false,
   });
   const mist = new THREE.Mesh(new THREE.PlaneGeometry(L.PLANE_W * 0.42, L.PLANE_H * 0.4), mistMat2);
   mist.position.set(-L.PLANE_W * 0.28, -L.PLANE_H * 0.22, -0.2);
   mist.renderOrder = 5;
+  mist.userData.baseX = mist.position.x;
+  mist.userData.baseY = mist.position.y;
+  mist.userData.shiftZ = -0.2;
   scene.add(mist);
   mistMat = mistMat2;
+  mistMesh = mist;
 }
 
 /* ---------- taxi + lightning ---------- */
@@ -1634,19 +1812,32 @@ function estimateDepthLive() {
   const status = $('depth-status');
   if (depthWorker) { status.textContent = '深度模型執行中…'; return; }
   status.textContent = '正在下載深度模型（約 27 MB，第一次）…';
+  // Round 1 fix — ROOT CAUSE of the live failure: the old code did
+  //   importScripts('.../transformers@3.7.2/dist/transformers.min.js')
+  // inside a classic worker, then read the global `Transformers`.
+  // Verified 2026-11-20 against the published 3.7.2 package:
+  // dist/transformers.min.js is an ESM bundle (it ends with a bare
+  // `export{...}`) and exposes NO global at all (`Transformers`
+  // appears 0 times in the file). importScripts can only load classic
+  // scripts, so it threw a SyntaxError at worker load — an uncaught
+  // worker error, hence the "深度模型載入失敗" status in under 2s with
+  // no model download at all. The documented v3 browser usage is a
+  // module import from the package root, so the worker is now a module
+  // worker (blob URL + { type: 'module' }) importing { pipeline, env,
+  // RawImage } directly. The paulkinlan demo that worked the same day
+  // uses this same ESM pattern.
   const workerSrc = `
-    importScripts('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
+    import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2';
     let est = null;
     onmessage = async (e) => {
       try {
         if (!est) {
-          const { pipeline, env } = Transformers;
           env.allowLocalModels = false;
           est = await pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small',
             { dtype: 'q8', progress_callback: (p) => postMessage({ type: 'progress', ...p }) });
         }
         const { data, width, height } = e.data;
-        const img = new Transformers.RawImage(new Uint8Array(data), width, height, 4);
+        const img = new RawImage(new Uint8Array(data), width, height, 4);
         const out = await est(img);
         const depth = out.depth; // RawImage grayscale
         postMessage({ type: 'done', width: depth.width, height: depth.height,
@@ -1657,7 +1848,7 @@ function estimateDepthLive() {
     };
   `;
   try {
-    depthWorker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })));
+    depthWorker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })), { type: 'module' });
   } catch (err) {
     status.textContent = 'Worker 無法建立 — 仍可使用離線深度圖';
     return;
@@ -1688,12 +1879,17 @@ function estimateDepthLive() {
       view.classList.remove('hidden');
       status.textContent = `即時深度估算完成（${m.width}×${m.height}，裝置內執行）`;
     } else if (m.type === 'error') {
-      status.textContent = '即時估算失敗 — 仍可使用離線深度圖';
+      status.textContent = '即時估算失敗' + (m.message ? '：' + m.message : '') + ' — 仍可使用離線深度圖';
+      console.error('depth worker error:', m.message);
       depthWorker = null;
     }
   };
-  depthWorker.onerror = () => {
-    status.textContent = '深度模型載入失敗 — 仍可使用離線深度圖';
+  depthWorker.onerror = (e) => {
+    // Surface the real error (round 1: the old handler swallowed it,
+    // so the failure was undiagnosable from the UI alone).
+    const detail = (e && (e.message || e.filename)) || '未知錯誤';
+    status.textContent = '深度模型載入失敗：' + detail + ' — 仍可使用離線深度圖';
+    console.error('depth worker load error:', e);
     depthWorker = null;
   };
   // Send the source art as RGBA pixels.
@@ -1766,9 +1962,18 @@ function bindHUD() {
   $('btn-audio').addEventListener('click', toggleAudio);
   $('btn-compare').addEventListener('click', () => setCompare(!state.compare));
   $('btn-inspector').addEventListener('click', () => setInspector(!state.inspector));
-  $('btn-hide').addEventListener('click', () => {
-    document.querySelectorAll('.hud').forEach((el) => el.classList.add('hidden'));
-    toast('按 H 恢復介面');
+  $('btn-hide').addEventListener('click', toggleHud);
+  $('sel-quality').addEventListener('change', () => {
+    const v = $('sel-quality').value;
+    if (v === 'auto') {
+      qualityMode = 'auto';
+      applyRenderScale(1);
+      toast('畫質：自動（卡頓時降級）');
+    } else {
+      qualityMode = 'manual';
+      applyRenderScale(parseFloat(v));
+      toast('畫質：' + (v === '1' ? '高' : v === '0.75' ? '中' : '低'));
+    }
   });
   $('btn-depth-live').addEventListener('click', estimateDepthLive);
   document.querySelectorAll('#insp-modes .btn').forEach((b) => {
@@ -1793,7 +1998,7 @@ function bindHUD() {
     if (e.repeat) return;
     const k = e.key.toLowerCase();
     if (k === 'c') setCompare(!state.compare);
-    else if (k === 'h') document.querySelectorAll('.hud').forEach((el) => el.classList.toggle('hidden'));
+    else if (k === 'h') toggleHud();
     else if (k === ' ') { e.preventDefault(); state.paused = !state.paused; toast(state.paused ? '已暫停' : '繼續播放'); }
     else if (k === 'm') toggleAudio();
     else if (k === 'd') setInspector(!state.inspector);
@@ -1806,13 +2011,47 @@ function bindHUD() {
     state.pointer.ty = clamp01((cy - r.top) / r.height) * 2 - 1;
     state.pointer.lastMove = performance.now();
   };
-  el.addEventListener('pointermove', (e) => updatePointer(e.clientX, e.clientY));
+  el.addEventListener('pointermove', (e) => { updatePointer(e.clientX, e.clientY); handleDrag(e.clientX, e.clientY); });
   el.addEventListener('pointerdown', (e) => {
     updatePointer(e.clientX, e.clientY);
     state.brush.active = true;
+    state.brush.swirlAng = null;
     handleTap(e.clientX, e.clientY);
   });
-  window.addEventListener('pointerup', () => { state.brush.active = false; });
+  window.addEventListener('pointerup', () => { state.brush.active = false; state.brush.swirlAng = null; });
+  // Drag interactions (round 1): brushing the noren while dragging
+  // across it, and swirling the steam with a circular drag over the
+  // bowl. The old code only applied a noren impulse on the initial tap
+  // and only translated the steam noise while the pointer was down
+  // anywhere — a drag across the curtains did almost nothing, and the
+  // steam "swirl" was a barely-visible one-time jump.
+  const handleDrag = (cx, cy) => {
+    if (!state.brush.active) return;
+    const r = el.getBoundingClientRect();
+    const px = (cx - r.left) / r.width * 1920, py = (cy - r.top) / r.height * 1080;
+    const hit = L.classifyTap(px, py);
+    const now = performance.now();
+    if (hit.kind === 'noren') {
+      if (hit.panel !== state.brush.lastPanel || now - state.brush.lastAt > 90) {
+        L.applyBrushNoren(state.sim, hit.panel, 1.4);
+        state.brush.lastPanel = hit.panel;
+        state.brush.lastAt = now;
+      }
+    }
+    if (hit.kind === 'steam') {
+      const bc = manifest.anchors.bowl_center;
+      const ang = Math.atan2(py - bc[1], px - bc[0]);
+      if (state.brush.swirlAng != null) {
+        let d = ang - state.brush.swirlAng;
+        if (d > Math.PI) d -= 2 * Math.PI;
+        if (d < -Math.PI) d += 2 * Math.PI;
+        if (Math.abs(d) < 1.2) L.addSwirl(state.sim, d);
+      }
+      state.brush.swirlAng = ang;
+    } else {
+      state.brush.swirlAng = null;
+    }
+  };
   el.addEventListener('wheel', (e) => {
     e.preventDefault();
     zoom = Math.max(1.0, Math.min(1.18, zoom + (e.deltaY < 0 ? 0.02 : -0.02)));
@@ -1848,6 +2087,15 @@ function setCompare(on) {
   $('curtain').classList.toggle('on', on);
   $('curtain').style.left = (state.curtainX * 100) + '%';
   if (postMat) postMat.uniforms.uCurtainOn.value = on ? 1 : 0;
+}
+/* Round 1 fix: hide/show ALL HUD chrome with one body class. The old
+   code toggled 'hidden' on every .hud element independently, which
+   inverted each panel's own state — a closed inspector got opened by
+   H, and it stayed visible while the rest hid. */
+function toggleHud() {
+  const hidden = document.body.classList.toggle('hud-hidden');
+  if (!hidden) toast('介面已恢復');
+  else toast('按 H 恢復介面');
 }
 function setInspector(on) {
   state.inspector = on;
@@ -1909,43 +2157,39 @@ function setLayerVisible(id, on) {
 }
 
 /* ---------- pointer taps: spark neon / brush noren / splash puddle ---------- */
+// The tap mapping lives in RamenLogic.classifyTap (pure, tested); this
+// is a thin switch over it. Round 1: a street tap now also drops a
+// lasting splash ring and a toast, so the feedback is observable even
+// at low fps (the PDE ripple alone decays in ~1s).
 function handleTap(cx, cy) {
   const r = renderer.domElement.getBoundingClientRect();
   const u = (cx - r.left) / r.width, v = (cy - r.top) / r.height; // v from top
-  // Neon signs (frame coords): OPEN, blue ramen, gyoza, vending, festoon.
-  const signs = [
-    [15, 330, 185, 450], [610, 380, 700, 500], [470, 430, 560, 540],
-    [430, 560, 500, 740], [1500, 120, 1830, 230],
-  ];
   const px = u * 1920, py = v * 1080;
-  for (let i = 0; i < signs.length; i++) {
-    const [x0, y0, x1, y1] = signs[i];
-    if (px >= x0 && px <= x1 && py >= y0 && py <= y1) {
-      L.applySpark(state.sim, i);
-      if (state.audioOn) AudioEngine.crackle();
-      toast('啪！霓虹燈跳了火花');
-      return;
-    }
-  }
-  // Noren brush: inside the curtain region -> spring impulse on nearest strip.
-  if (px >= 785 && px <= 1295 && py >= 55 && py <= 730) {
-    const panel = Math.min(5, Math.floor((px - 785) / (510 / 6)));
-    L.applyBrushNoren(state.sim, panel, 2.2);
+  const hit = L.classifyTap(px, py);
+  if (hit.kind === 'neon') {
+    L.applySpark(state.sim, hit.sign);
+    if (state.audioOn) AudioEngine.crackle();
+    toast('啪！霓虹燈跳了火花');
     return;
   }
-  // Lantern brush: near either lantern -> swing impulse.
-  const dFront = Math.hypot(px - 445, py - 175);
-  const dRear = Math.hypot(px - 1405, py - 255);
-  if (dFront < 140) { L.applyImpulseLantern(state.sim, 1, 0.9); return; }
-  if (dRear < 120) { L.applyImpulseLantern(state.sim, 0, 0.9); return; }
-  // Street splash: inside the street region -> water impulse + drip sound.
-  if (px < 700 && py > 700) {
-    const fx = px / 1920 / 0.36, fy = (py - 700) / 380;
+  if (hit.kind === 'noren') {
+    L.applyBrushNoren(state.sim, hit.panel, 2.2);
+    return;
+  }
+  if (hit.kind === 'lantern') {
+    L.applyImpulseLantern(state.sim, hit.which, 0.9);
+    return;
+  }
+  if (hit.kind === 'steam') return; // swirl is a drag, not a tap
+  if (hit.kind === 'street') {
+    const fx = hit.fx, fy = hit.fy;
     if (water && !water.cpu) {
       pendingImpulses.push({ x: fx, y: fy, amp: 1.2 });
     } else if (water && water.cpu) {
       L.waterImpulse(state.sim.water.h, state.sim.water.n, fx, fy, 1.2, 0.05);
     }
+    L.addRing(state.sim, fx, fy, 1.2);
+    toast('水花！');
     if (state.audioOn) AudioEngine.blip(700, 240, 0.14, 0.12, (u - 0.5) * 0.6);
   }
 }
@@ -1955,10 +2199,21 @@ const pendingImpulses = []; // tap splashes, consumed by the next frame's water 
 function syncScene() {
   const sim = state.sim, p = sim.params;
   syncRainLines();
-  const px = state.pointer.x * p.parallax, py = -state.pointer.y * p.parallax;
+  // Parallax scale for this viewport aspect (round 1): at 16:9 it is 1
+  // (full spec amplitude); on wider viewports the fixed 1.18 overscan
+  // cannot cover full deflection, so the shift is scaled down just
+  // enough that no plate ever leaves the frame uncovered.
+  const pScale = L.parallaxScaleFor(camera.aspect);
+  const px = state.pointer.x * p.parallax * pScale, py = -state.pointer.y * p.parallax * pScale;
   // Parallax: plates shift by depth; camera stays fixed.
   for (const [id, mesh] of Object.entries(plates)) {
-    const z = mesh.position.z;
+    // Lantern plates live inside swing groups with a pivot offset in
+    // mesh.position — never overwrite it here (round 1 fix); the group
+    // is shifted below instead.
+    if (mesh.userData.lantern) continue;
+    // The emissive overlay shifts with the backdrop depth (most signs
+    // live there), not its own z = 0.5, which would over-shift it.
+    const z = mesh.userData.shiftZ != null ? mesh.userData.shiftZ : mesh.position.z;
     const sh = L.plateShift(z, px, py);
     mesh.position.x = sh.x;
     mesh.position.y = sh.y;
@@ -1972,9 +2227,27 @@ function syncScene() {
     strip.material.uniforms.uWind.value = p.wind;
     strip.material.uniforms.uTime.value = sim.t;
   }
-  // Lantern swings.
-  lanternGroups[0].rotation.z = sim.lanterns[0].a;
-  lanternGroups[1].rotation.z = sim.lanterns[1].a;
+  // Lantern swings: rotate around the ceiling hook AND shift the whole
+  // group with parallax (round 1 fix — the shift used to be applied to
+  // the mesh inside the group, clobbering its pivot offset).
+  lanternGroups.forEach((g, i) => {
+    const sh = L.plateShift(g.userData.z, px, py);
+    g.position.x = g.userData.baseX + sh.x;
+    g.position.y = g.userData.baseY + sh.y;
+    g.rotation.z = sim.lanterns[i].a;
+  });
+  // Steam / mist follow their plates under parallax (round 1 fix: they
+  // used to stay fixed while the bowl and street moved).
+  for (const m of steamMeshes) {
+    const sh = L.plateShift(m.userData.shiftZ, px, py);
+    m.position.x = m.userData.baseX + sh.x;
+    m.position.y = m.userData.baseY + sh.y;
+  }
+  if (mistMesh) {
+    const sh = L.plateShift(mistMesh.userData.shiftZ, px, py);
+    mistMesh.position.x = mistMesh.userData.baseX + sh.x;
+    mistMesh.position.y = mistMesh.userData.baseY + sh.y;
+  }
   // Woman rig.
   const wm = plates['layer4'].userData.womanMat;
   if (wm) {
@@ -1998,6 +2271,13 @@ function syncScene() {
     streetMat.uniforms.uTime.value = sim.t;
     streetMat.uniforms.uFlicker.value = 0.5 + 0.5 * p.flicker;
     streetMat.uniforms.uBrownout.value = sim.events.lightningEnv;
+    // Tap splash rings (round 1): upload the sim's rings to the shader.
+    const rings = streetMat.uniforms.uRings.value;
+    for (let i = 0; i < 4; i++) {
+      const rg = sim.rings[i];
+      if (rg) rings[i].set(rg.x, rg.y, rg.age, rg.amp);
+      else rings[i].set(0, 0, 0, 0);
+    }
     if (water) {
       if (water.cpu) {
         streetMat.uniforms.uCpuWater.value = 1;
@@ -2026,10 +2306,13 @@ function syncScene() {
   for (const m of steamMats) {
     m.uniforms.uTime.value = sim.t;
     m.uniforms.uAmount.value = p.steam;
-    m.uniforms.uSwirl.value = state.brush.active ? 1 : 0;
+    // Round 1: the swirl now comes from the sim (accumulated drag
+    // angle, decaying), not from "any pointer is down".
+    m.uniforms.uSwirl.value = sim.swirl;
+    m.uniforms.uSwirlAng.value = sim.swirlAng;
     m.uniforms.uSwirlDir.value.set(state.pointer.x, -state.pointer.y);
   }
-  if (mistMat) mistMat.uniforms.uTime.value = sim.t;
+  if (mistMat) { mistMat.uniforms.uTime.value = sim.t; mistMat.uniforms.uSwirlAng.value = 0; }
   // Taxi.
   if (taxiGroup) {
     const ev = sim.events;
@@ -2059,6 +2342,23 @@ function syncScene() {
     for (const sp of sim.splashes) {
       AudioEngine.blip(800 + Math.random() * 500, 260, 0.12, 0.05, (sp.x - 0.5) * 0.5);
     }
+  }
+}
+
+/* ---------- adaptive render quality (round 1) ---------- */
+// The live E2E measured 4 fps in the cloud browser (software WebGL).
+// The sim itself is cheap (~33x real time); the cost is GPU fill at
+// full resolution. Render scale 1 / 0.75 / 0.5 cuts the fill cost to
+// 100% / 56% / 25%. Auto mode steps down when slow and back up when
+// comfortably fast; the HUD select overrides it manually.
+let renderScale = 1, qualityMode = 'auto', qualityEvalTime = 0;
+function applyRenderScale(s) {
+  renderScale = s;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * s);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (postRT && postMat) {
+    postRT.setSize(renderer.domElement.width, renderer.domElement.height);
+    postMat.uniforms.uRes.value.set(renderer.domElement.width, renderer.domElement.height);
   }
 }
 
@@ -2110,6 +2410,16 @@ function loop(now) {
     fpsFrames = 0; fpsTime = 0;
     const el = $('fps');
     if (el) el.textContent = state.fps + ' fps';
+  }
+  // Adaptive quality: in auto mode, re-evaluate the tier every 2s so a
+  // single hitch does not flap it.
+  if (qualityMode === 'auto') {
+    qualityEvalTime += dtWall;
+    if (qualityEvalTime >= 2) {
+      qualityEvalTime = 0;
+      const next = L.qualityTierFor(state.fps, renderScale);
+      if (next !== renderScale) applyRenderScale(next);
+    }
   }
   // Camera zoom (wheel/pinch).
   camera.fov = 2 * Math.atan((L.PLANE_H / 2) / L.CAM_D) * 180 / Math.PI / zoom;

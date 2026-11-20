@@ -108,7 +108,11 @@ test('rain: splashes only from the street band, normalised to the heightfield', 
   assert.equal(spl.length, 1, 'a drop landing in the band splashes');
   assert.ok(spl[0].x >= 0 && spl[0].x <= 1, `splash x normalised: ${spl[0].x}`);
   assert.ok(Math.abs(spl[0].x - 0.2 / 0.36) < 0.01, 'splash x is frame-x / 0.36');
-  assert.ok(Math.abs(spl[0].y - (0.9 - 0.65) / 0.35) < 0.01, 'splash y is (land-0.65)/0.35');
+  // Bottom-origin heightfield (round 1 fix): a drop landing at land=0.9
+  // (near the bottom of the band) maps to y near 0, i.e. the last grid
+  // row, which the street shader reads at the frame bottom.
+  assert.ok(Math.abs(spl[0].y - (1 - (0.9 - 0.65) / 0.35)) < 0.01,
+    `splash y is flipped to bottom-origin: ${spl[0].y}`);
   // A drop landing outside the band (in x) does not splash.
   const outside = [{ x: 0.8, y: 1.01, speed: 1, slant: 0.15, len: 0.02, land: 0.9 }];
   assert.equal(L.stepRain(outside, 1, 1 / 60, 0, L.mulberry32(1)).length, 0);
@@ -229,4 +233,116 @@ test('nextEventDelay ranges', () => {
     const l = L.nextEventDelay(rng, 'lightning');
     assert.ok(l >= 28 && l <= 58, `lightning delay ${l}`);
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* Fix round 1 — regressions for the live E2E failures of 2026-11-20   */
+/* ------------------------------------------------------------------ */
+
+test('round 1: coversFrame is aspect-aware; clamped parallax always covers', () => {
+  // The old coversFrame ignored the viewport aspect and returned true
+  // for every layer at full deflection — the live E2E window (1919x998,
+  // aspect 1.923) showed real gaps at the frame edge.
+  assert.ok(L.coversFrame(0.34, 1, 1), '16:9 covers at full deflection (default aspect)');
+  assert.ok(!L.coversFrame(0.34, 1, 1, 1.923), 'aspect 1.923 does NOT cover at full deflection');
+  assert.ok(!L.coversFrame(-0.36, 1, 1, 1.923), 'backdrop also falls short at aspect 1.923');
+  // The clamp: full amplitude at 16:9 and narrower, reduced on wider screens.
+  assert.equal(L.parallaxScaleFor(16 / 9), 1);
+  assert.equal(L.parallaxScaleFor(1.0), 1, 'portrait keeps full parallax');
+  const s1923 = L.parallaxScaleFor(1.923);
+  assert.ok(s1923 > 0.5 && s1923 < 0.7, `aspect 1.923 scales parallax to ~0.63, got ${s1923}`);
+  assert.equal(L.parallaxScaleFor(3), 0, 'absurdly wide viewports get no parallax rather than gaps');
+  assert.ok(L.parallaxScaleFor(2.4) === 0, 'aspect 2.4: even rest coverage fails, so parallax is 0');
+  // The key invariant: at the clamped scale, every plate covers at every
+  // aspect where rest coverage is possible at all.
+  for (const aspect of [0.5, 1.0, 16 / 9, 1.923]) {
+    const s = L.parallaxScaleFor(aspect);
+    for (const l of L.LAYERS) {
+      assert.ok(L.coversFrame(l.z, s, s, aspect), `z=${l.z} covers at aspect ${aspect} scale ${s}`);
+      assert.ok(L.coversFrame(l.z, -s, -s, aspect), `z=${l.z} covers at aspect ${aspect} scale -${s}`);
+    }
+  }
+});
+
+test('round 1: tap classification maps the frame regions', () => {
+  // Neon signs.
+  assert.equal(L.classifyTap(100, 390).kind, 'neon');
+  assert.equal(L.classifyTap(100, 390).sign, 0, 'OPEN sign is sign 0');
+  assert.equal(L.classifyTap(650, 440).kind, 'neon');
+  // Noren panels: left edge -> panel 0, right edge -> panel 5.
+  // (Field-by-field, not deepEqual: the logic block runs in a vm
+  // sandbox, so its objects have a different realm's prototype and
+  // deepStrictEqual rejects them.)
+  const n0 = L.classifyTap(800, 400);
+  assert.equal(n0.kind, 'noren'); assert.equal(n0.panel, 0);
+  const n5 = L.classifyTap(1280, 400);
+  assert.equal(n5.kind, 'noren'); assert.equal(n5.panel, 5);
+  // Lanterns.
+  assert.equal(L.classifyTap(445, 175).kind, 'lantern');
+  assert.equal(L.classifyTap(445, 175).which, 1, 'front lantern is which=1');
+  assert.equal(L.classifyTap(1405, 255).which, 0, 'rear lantern is which=0');
+  // Steam region (bowl).
+  assert.equal(L.classifyTap(1500, 700).kind, 'steam');
+  // Street: bottom-origin water coords — just inside the top of the
+  // band (py=701; the band starts at py>700) is fy≈1.
+  const top = L.classifyTap(300, 701);
+  assert.equal(top.kind, 'street');
+  assert.ok(Math.abs(top.fx - 300 / 1920 / 0.36) < 1e-9);
+  assert.ok(Math.abs(top.fy - (1 - 1 / 380)) < 1e-9, `top of the street band is fy≈1 (bottom-origin grid): ${top.fy}`);
+  const bot = L.classifyTap(300, 1080);
+  assert.ok(Math.abs(bot.fy - 0) < 1e-9, 'bottom of the street band is fy=0');
+  // Outside everything.
+  assert.equal(L.classifyTap(100, 100).kind, 'none');
+});
+
+test('round 1: water grid is bottom-origin (top-of-band tap raises the last row)', () => {
+  const n = 32;
+  const h = new Float32Array(n * n);
+  const top = L.classifyTap(300, 701);
+  assert.equal(top.kind, 'street');
+  L.waterImpulse(h, n, top.fx, top.fy, 1.0, 0.05);
+  const col = Math.floor(top.fx * (n - 1));
+  const lastRowCell = h[(n - 1) * n + col];
+  assert.ok(lastRowCell > 0.5, `top-of-band tap raises the last row (h=${lastRowCell})`);
+  assert.equal(h[col], 0, 'first row untouched by a top-of-band tap');
+});
+
+test('round 1: tap splash rings persist ~3s then expire, capped at 4', () => {
+  const sim = L.createSim();
+  assert.equal(sim.rings.length, 0);
+  L.addRing(sim, 0.5, 0.5, 1.2);
+  assert.equal(sim.rings.length, 1);
+  assert.equal(sim.rings[0].age, 0);
+  for (let i = 0; i < 90; i++) L.stepSim(sim); // 1.5 s
+  assert.equal(sim.rings.length, 1, 'ring still there at 1.5 s');
+  assert.ok(sim.rings[0].age > 1.4 && sim.rings[0].age < 1.6, `ring age ${sim.rings[0].age}`);
+  for (let i = 0; i < 120; i++) L.stepSim(sim); // +2 s = 3.5 s total
+  assert.equal(sim.rings.length, 0, 'ring expired after 3 s');
+  for (let i = 0; i < 6; i++) L.addRing(sim, 0.1 * i, 0.1 * i, 1);
+  assert.equal(sim.rings.length, 4, 'rings capped at 4');
+});
+
+test('round 1: steam swirl accumulates with drag angle and decays', () => {
+  const sim = L.createSim();
+  assert.equal(sim.swirl, 0);
+  L.addSwirl(sim, 0.5);
+  assert.ok(sim.swirl > 0.2, 'drag adds swirl strength');
+  assert.ok(Math.abs(sim.swirlAng - 0.5) < 1e-9);
+  L.addSwirl(sim, -0.2);
+  assert.ok(Math.abs(sim.swirlAng - 0.3) < 1e-9, 'angle accumulates signed');
+  const s0 = sim.swirl;
+  for (let i = 0; i < 120; i++) L.stepSim(sim); // 2 s
+  assert.ok(sim.swirl < s0 * 0.1, `swirl decays (was ${s0}, now ${sim.swirl})`);
+  assert.ok(Math.abs(sim.swirlAng) < 0.3 * 0.3, `angle relaxes toward 0 (${sim.swirlAng})`);
+});
+
+test('round 1: quality tiers step down when slow, up when fast', () => {
+  assert.equal(L.qualityTierFor(10, 1), 0.75);
+  assert.equal(L.qualityTierFor(10, 0.75), 0.5);
+  assert.equal(L.qualityTierFor(10, 0.5), 0.5, 'floor at 0.5');
+  assert.equal(L.qualityTierFor(60, 0.5), 0.75);
+  assert.equal(L.qualityTierFor(60, 0.75), 1);
+  assert.equal(L.qualityTierFor(60, 1), 1, 'ceiling at 1');
+  assert.equal(L.qualityTierFor(30, 1), 1, 'mid-range fps holds the tier');
+  assert.equal(L.qualityTierFor(30, 0.5), 0.5);
 });

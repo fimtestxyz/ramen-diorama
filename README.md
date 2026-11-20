@@ -8,11 +8,18 @@ Faithful to the Shinya Ramen showcase spec, built in one pass. See
 
 ## Status
 
-Built 2026-11-20, pending live verification (no live-browser E2E yet —
-see the checklist below). Source art `assets/source-art.png`, 1920×1080,
-original illustration. All 13 features implemented in `index.html`
-(88 KB, single file, no build step). Headless tests: 23 JS tests
-(`node --test test/*.test.mjs`) + Python slice tests — all passing.
+Built 2026-11-20, deployed to Vercel
+(https://ramen-diorama.vercel.app). **Live E2E 2026-11-20 13:53–14:10
+returned NOT SHIPPABLE** — rest alignment broken (noren mirrored),
+parallax gaps at full deflection, live depth model failed to load,
+puddle/steam interactions not observable, 4 fps in the cloud browser,
+H did not hide the inspector. **Fix round 1 is done locally (not yet
+pushed, not yet re-verified live)** — see "Fix round 1" in `spec.md`
+for the root causes. Headless tests: 34 JS tests (`node --test
+test/*.test.mjs test/smoke.mjs`) + Python slice tests — all passing.
+Source art `assets/source-art.png`, 1920×1080, original illustration.
+All features implemented in `index.html` (103 KB, single file, no
+build step).
 
 ## Pipeline
 
