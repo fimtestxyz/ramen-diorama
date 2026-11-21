@@ -58,4 +58,6 @@ v0.1.1 once the crop choice (symmetric vs keep-top) is decided.
 
 ## History
 
-- v0.1.0 — (pending) first stable release; see scope above.
+- v0.1.0 — 2026-11-21, head `2bad08d`, E2E #12 SHIPPABLE
+  (build 2026-11-21 13:12). First stable release; see scope above.
+  Release: https://github.com/fimtestxyz/ramen-diorama/releases/tag/v0.1.0
