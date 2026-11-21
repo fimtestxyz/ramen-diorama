@@ -1,0 +1,138 @@
+{
+  "scene": "himeji-cafe",
+  "name": "Warm Himeji kissaten interior, castle through the window",
+  "source": "assets/scenes/himeji-cafe/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.0808
+    },
+    "layer1": {
+      "file": "layers/layer1-far-castle.png",
+      "z": -0.05,
+      "coverage": 0.1376
+    },
+    "layer2": {
+      "file": "layers/layer2-window-frames.png",
+      "z": 0.15,
+      "coverage": 0.0422
+    },
+    "layer3": {
+      "file": "layers/layer3-lamps-shelves.png",
+      "z": 0.2,
+      "coverage": 0.4113
+    },
+    "layer4": {
+      "file": "layers/layer4-foreground-counter.png",
+      "z": 0.34,
+      "coverage": 0.3281
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.0422
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.7835
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0563
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.0024
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.1756
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.0395
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.0318
+    }
+  },
+  "anchors": {
+    "castle_center": [
+      1410,
+      440
+    ],
+    "counter_top_y": 720,
+    "cup_center": [
+      945,
+      805
+    ],
+    "cup_left": [
+      455,
+      860
+    ],
+    "cup_right": [
+      1335,
+      760
+    ],
+    "lamp_a": [
+      195,
+      75
+    ],
+    "lamp_b": [
+      735,
+      210
+    ],
+    "lamp_c": [
+      1160,
+      95
+    ],
+    "lamp_d": [
+      1355,
+      180
+    ],
+    "lamp_e": [
+      1570,
+      245
+    ],
+    "lamp_f": [
+      1815,
+      225
+    ],
+    "lamp_front_pivot": [
+      195,
+      0
+    ],
+    "lamp_g": [
+      935,
+      280
+    ],
+    "lamp_rear_pivot": [
+      935,
+      0
+    ],
+    "steam_top": [
+      945,
+      600
+    ],
+    "street_band": [
+      990,
+      620,
+      1920,
+      690
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.002,
+    "p99": 0.0,
+    "max": 4.4
+  }
+}

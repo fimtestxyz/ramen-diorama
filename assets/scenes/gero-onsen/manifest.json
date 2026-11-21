@@ -1,0 +1,101 @@
+{
+  "scene": "gero-onsen",
+  "name": "Gero rotenburo outdoor onsen at dusk",
+  "source": "assets/scenes/gero-onsen/source-art.png",
+  "size": [
+    1920,
+    1080
+  ],
+  "layers": {
+    "layer0": {
+      "file": "layers/layer0-backdrop.png",
+      "z": -0.36,
+      "coverage": 0.1123
+    },
+    "layer1": {
+      "file": "layers/layer1-far-mountains.png",
+      "z": -0.05,
+      "coverage": 0.2127
+    },
+    "layer2": {
+      "file": "layers/layer2-fence-trees.png",
+      "z": 0.15,
+      "coverage": 0.3121
+    },
+    "layer3": {
+      "file": "layers/layer3-lanterns.png",
+      "z": 0.2,
+      "coverage": 0.0294
+    },
+    "layer4": {
+      "file": "layers/layer4-foreground-bath.png",
+      "z": 0.34,
+      "coverage": 0.3335
+    }
+  },
+  "masks": {
+    "mask-cloth": {
+      "file": "masks/mask-cloth.png",
+      "coverage": 0.3121
+    },
+    "mask-dry": {
+      "file": "masks/mask-dry.png",
+      "coverage": 0.1845
+    },
+    "mask-emissive": {
+      "file": "masks/mask-emissive.png",
+      "coverage": 0.0115
+    },
+    "mask-flame": {
+      "file": "masks/mask-flame.png",
+      "coverage": 0.0007
+    },
+    "mask-rain": {
+      "file": "masks/mask-rain.png",
+      "coverage": 0.6371
+    },
+    "mask-steam": {
+      "file": "masks/mask-steam.png",
+      "coverage": 0.1238
+    },
+    "mask-street": {
+      "file": "masks/mask-street.png",
+      "coverage": 0.3519
+    }
+  },
+  "anchors": {
+    "bath_center": [
+      500,
+      800
+    ],
+    "bath_mid": [
+      900,
+      830
+    ],
+    "lantern_left": [
+      260,
+      545
+    ],
+    "lantern_right": [
+      1630,
+      650
+    ],
+    "steam_top": [
+      500,
+      340
+    ],
+    "street_band": [
+      0,
+      700,
+      1920,
+      1080
+    ]
+  },
+  "cloth_layer": null,
+  "static_file": null,
+  "rest_composite": {
+    "mean_abs_diff": 0.004,
+    "p99": 0.05,
+    "max": 6.3
+  }
+}
