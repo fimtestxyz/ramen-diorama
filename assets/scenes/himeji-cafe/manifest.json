@@ -10,33 +10,33 @@
     "layer0": {
       "file": "layers/layer0-backdrop.png",
       "z": -0.36,
-      "coverage": 0.0808
+      "coverage": 0.081
     },
     "layer1": {
       "file": "layers/layer1-far-castle.png",
       "z": -0.05,
-      "coverage": 0.1376
+      "coverage": 0.1449
     },
     "layer2": {
       "file": "layers/layer2-window-frames.png",
       "z": 0.15,
-      "coverage": 0.0422
+      "coverage": 0.0446
     },
     "layer3": {
       "file": "layers/layer3-lamps-shelves.png",
       "z": 0.2,
-      "coverage": 0.4113
+      "coverage": 0.4294
     },
     "layer4": {
       "file": "layers/layer4-foreground-counter.png",
       "z": 0.34,
-      "coverage": 0.3281
+      "coverage": 0.3002
     }
   },
   "masks": {
     "mask-cloth": {
       "file": "masks/mask-cloth.png",
-      "coverage": 0.0422
+      "coverage": 0.0446
     },
     "mask-dry": {
       "file": "masks/mask-dry.png",
@@ -52,11 +52,11 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.1785
+      "coverage": 0.1618
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",
-      "coverage": 0.0395
+      "coverage": 0.0458
     },
     "mask-street": {
       "file": "masks/mask-street.png",
@@ -66,20 +66,20 @@
   "anchors": {
     "castle_center": [
       1410,
-      440
+      430
     ],
     "counter_top_y": 720,
     "cup_center": [
-      945,
-      805
+      972,
+      828
     ],
     "cup_left": [
-      455,
-      860
+      430,
+      878
     ],
     "cup_right": [
-      1335,
-      760
+      1330,
+      785
     ],
     "lamp_a": [
       195,
@@ -118,8 +118,8 @@
       0
     ],
     "steam_top": [
-      945,
-      600
+      972,
+      623
     ],
     "street_band": [
       990,
@@ -133,6 +133,6 @@
   "rest_composite": {
     "mean_abs_diff": 0.002,
     "p99": 0.0,
-    "max": 4.4
+    "max": 5.3
   }
 }
