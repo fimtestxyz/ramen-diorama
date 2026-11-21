@@ -292,7 +292,11 @@ test('round 1: overlays and steam follow parallax', () => {
   assert.ok(html.includes("plates['street'] = mesh"), 'street overlay registered in plates');
   assert.ok(html.includes("plates['emissive'] = mesh"), 'emissive overlay registered in plates');
   assert.ok(html.includes('mesh.userData.shiftZ = -0.36'), 'emissive shifts with the backdrop depth');
-  assert.ok(html.includes('steamMeshes.push(mesh)'), 'steam planes tracked for parallax');
+  // Particle steam (2026-11-21): one THREE.Points for all columns,
+  // shifted with the steam layer under parallax like the old column.
+  assert.ok(html.includes('steamPoints = new THREE.Points(geo, mat)'), 'particle steam built as one Points');
+  assert.ok(html.includes('steamPoints.userData.shiftZ = st.z'), 'steam Points shifts with its layer');
+  assert.ok(html.includes('steamPoints.frustumCulled = false'), 'steam Points never culled on a stale bound');
   assert.ok(html.includes('L.parallaxScaleFor(camera.aspect)'), 'parallax is aspect-scaled at runtime');
 });
 
@@ -314,7 +318,10 @@ test('round 1: H hides all HUD chrome via one body class; rings + swirl wired', 
   assert.ok(html.includes("document.body.classList.toggle('hud-hidden')"), 'H toggles the body class');
   assert.ok(html.includes('body.hud-hidden .hud:not(#toast)'), 'CSS hides HUD chrome except the toast');
   assert.ok(html.includes('uniform vec4 uRings[4]'), 'street shader declares the ring uniforms');
-  assert.ok(html.includes('uSwirlAng'), 'steam shader has a swirl-angle uniform');
+  assert.ok(html.includes('uSwirlAng'), 'mist shader keeps a swirl-angle uniform');
+  // Particle steam: the drag swirl twists the puffs sideways via the
+  // pure L.steamParticle, fed from the sim every frame.
+  assert.ok(html.includes('L.steamParticle(pt.src, phase, pt, p.wind, sim.swirl, sim.swirlAng)'), 'puffs take wind + swirl from the sim');
   assert.ok(html.includes('id="sel-quality"'), 'quality select exists in the HUD');
   assert.ok(html.includes('L.addRing(state.sim, fx, fy, 1.2)'), 'street tap adds a splash ring');
   assert.ok(html.includes('L.addSwirl(state.sim, d)'), 'steam drag accumulates swirl');

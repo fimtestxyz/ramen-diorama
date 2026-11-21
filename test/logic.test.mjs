@@ -468,6 +468,17 @@ test('lint: registry geometry matches the scene anchors in scripts/scenes.json',
       assert.equal(def.steam.src[0], a.steam_top[0], `${id}: steam src under its top`);
       assert.ok(def.steam.src[1] > a.steam_top[1], `${id}: steam src below its top`);
     }
+    // Extra steam columns (himeji's other cups, gero's bath spread):
+    // each src must be a named anchor in scenes.json, and its top
+    // must sit directly above it on the same x.
+    if (def.steam && def.steam.extra) {
+      const anchorVals = new Set(Object.values(a).map((v) => (Array.isArray(v) ? v.join(',') : null)));
+      for (const ex of def.steam.extra) {
+        assert.ok(anchorVals.has(ex.src.join(',')), `${id}: extra steam src ${ex.src} is a scenes.json anchor`);
+        assert.equal(ex.top[0], ex.src[0], `${id}: extra steam top above its src`);
+        assert.ok(ex.top[1] < ex.src[1], `${id}: extra steam top above its src`);
+      }
+    }
     // Swinging lantern pivot is the hang point: x must equal the front
     // lantern anchor, y must be the top edge (0).
     if (def.lanterns.length && a.lantern_front_pivot) {
@@ -536,6 +547,43 @@ test('phase 2: steamPlaneRect puts the steam above the source (ramen fix)', () =
     assert.ok(Math.abs(p.cyV * 1080 - midY) < 1e-9, `${def.id}: steam centre ${p.cyV * 1080} vs ${midY}`);
     assert.ok(p.hFrac > 0, `${def.id}: steam has height`);
   }
+});
+
+test('steam particles (2026-11-21): every cup / bath column steams; puffs rise, grow and fade', () => {
+  // himeji's three cups and gero's three bath columns each get a
+  // column; hakodate stays steam-less; ramen keeps bowl + pot.
+  const h = L.steamSources(L.sceneById('himeji-cafe'));
+  assert.equal(h.length, 3);
+  assert.equal(h.map((s) => s.src.join(',')).join(' | '), '945,805 | 455,860 | 1335,760');
+  const g = L.steamSources(L.sceneById('gero-onsen'));
+  assert.equal(g.length, 3);
+  assert.equal(g.map((s) => s.src.join(',')).join(' | '), '500,800 | 900,830 | 1300,820');
+  assert.equal(L.steamSources(L.sceneById('hakodate-goryokaku')).length, 0);
+  assert.equal(L.steamSources(L.sceneById('ramen')).length, 2);
+  // A puff: phase 0 sits on the source invisible, phase 0.5 is
+  // mid-rise and visible and bigger, phase 1 reaches the top
+  // invisible again — so the column is visibly rising, not static.
+  const src = h[0];
+  const seed = { offset: 0, sway: 0, size: 1 };
+  const p0 = L.steamParticle(src, 0, seed, 0, 0, 0);
+  assert.equal(p0.y, 805); assert.equal(p0.alpha, 0);
+  const p5 = L.steamParticle(src, 0.5, seed, 0, 0, 0);
+  assert.ok(p5.y > 600 && p5.y < 805, `mid-rise y ${p5.y}`);
+  assert.ok(p5.alpha > 0.2, `mid-rise alpha ${p5.alpha}`);
+  assert.ok(p5.size > p0.size, `puff grows ${p0.size} -> ${p5.size}`);
+  const p1 = L.steamParticle(src, 1, seed, 0, 0, 0);
+  assert.equal(p1.y, 600); assert.equal(p1.alpha, 0);
+  // Wind drifts exactly wind * phase * 70 px sideways (sway cancels
+  // out when the same seed and phase are compared).
+  const windDrift = L.steamParticle(src, 0.9, seed, 1, 0, 0).x - L.steamParticle(src, 0.9, seed, 0, 0, 0).x;
+  assert.ok(Math.abs(windDrift - 63) < 1e-9, `wind drift ${windDrift} vs 63`);
+  // The drag swirl twists the puff sideways.
+  assert.notEqual(
+    L.steamParticle(src, 0.5, seed, 0, 1, 0).x, L.steamParticle(src, 0.5, seed, 0, 0, 0).x);
+  // Taps on the side cups and the bath columns swirl the steam too.
+  assert.equal(L.classifyTap(455, 700, 'himeji-cafe').kind, 'steam');
+  assert.equal(L.classifyTap(1335, 650, 'himeji-cafe').kind, 'steam');
+  assert.equal(L.classifyTap(900, 600, 'gero-onsen').kind, 'steam');
 });
 
 test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {

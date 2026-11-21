@@ -1531,3 +1531,37 @@ for this). Fix, index.html only, zero re-slice:
   rain on himeji window / gero river band, no freeze on interior
   himeji; seam fix — idle a few seconds, the picture goes pixel-perfect
   (no band at rest); at full pointer deflection the worst band ≈38 px.
+
+## Particle steam (2026-11-21, user request: cup + onsen steam must visibly animate in three.js)
+
+Problem: the old steam was a fixed shader plane whose fbm noise
+scrolled inside it — the column itself never moved, so on a phone it
+read as static. E2E #9 could only confirm it by diffing two zoomed
+screenshots 6 s apart. The user asked for three.js animation.
+
+Fix, index.html only, zero re-slice:
+- One THREE.Points per scene, one soft-disc shader (size/alpha from
+  per-particle attributes), positions rewritten every frame from the
+  pure `L.steamParticle` (seeded, deterministic — a frame is still a
+  pure function of sim time). Each puff spawns on its source, rises
+  to the column top over 2.6 s, grows 16→54 px, sways, drifts with
+  the wind slider, fades in fast and out slow, and the drag swirl
+  twists it sideways. The Points object shifts with the steam layer
+  under parallax (same as the old column); frustumCulled is off
+  because the positions are rewritten every frame.
+- Every column steams, not just the main one: himeji's three cups
+  (centre + cup_left/cup_right anchors) and gero's three bath columns
+  (bath_center/bath_mid/bath_right — bath_right added to
+  scripts/scenes.json). Taps on any column swirl the steam
+  (classifyTap loops over `L.steamSources`). Ramen keeps bowl + pot.
+- The alley mist plane (same STEAM_FRAG shader) is unchanged; the
+  post heat-haze still centres on the main source.
+- Tests: new logic test (sources per scene, puff rise/grow/fade,
+  exact wind drift 63 px, swirl twist, side-cup/bath taps) + lint
+  extension (every extra src must be a scenes.json anchor, top
+  directly above it). Smoke tests updated to the Points system.
+  JS is now 67/67 (39 logic + 28 smoke); Python scenes/slices pass.
+- Live E2E still to check: himeji — steam visibly rises from all
+  three cups (screenshots 2–3 s apart show different puff
+  positions); gero — steam rises across the bath; steam slider 0
+  hides it; ramen bowl/pot unchanged; no console errors.

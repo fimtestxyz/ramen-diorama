@@ -188,7 +188,7 @@
 
 <div id="title" class="hud glass">
   <h1 id="scene-title">深夜ラーメン <span>· 2.5D</span></h1>
-  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-21 00:47</span></p>
+  <p><span data-i18n="app.subtitle">一張圖 · 全部在你的裝置上算出來</span> · <span id="fps">— fps</span> · <span id="build-stamp" title="Build timestamp — tells a stale cached copy from the current one">build 2026-11-21 10:14</span></p>
 </div>
 
 <div id="topbtns" class="hud">
@@ -454,7 +454,11 @@
       signs: [[45, 0, 346, 166], [1067, 0, 1254, 199], [1272, 89, 1439, 272],
               [1732, 138, 1899, 313], [1495, 156, 1646, 335], [662, 135, 809, 286],
               [882, 217, 989, 344]],
-      steam: { src: [945, 805], top: [945, 600], width: 0.10, z: 0.34, mist: [0.49, 0.72] },
+      steam: { src: [945, 805], top: [945, 600], width: 0.10, z: 0.34, mist: [0.49, 0.72],
+        /* The other two cups steam too: same 205 px rise as the centre
+           cup. Anchors cup_left / cup_right in scripts/scenes.json. */
+        extra: [{ src: [455, 860], top: [455, 655], width: 0.10 },
+                { src: [1335, 760], top: [1335, 555], width: 0.10 }] },
       street: { x0: 990, y0: 620, x1: 1920, y1: 690 },
       drips: null,
       snow: false },
@@ -468,7 +472,11 @@
          emissive-mask blobs (flood-filled bboxes, padded ~15 px).
          Stone lanterns do not swing. */
       signs: [[170, 480, 341, 631], [1555, 580, 1706, 721]],
-      steam: { src: [500, 800], top: [500, 340], width: 0.16, z: 0.34, mist: [0.47, 0.75] },
+      steam: { src: [500, 800], top: [500, 340], width: 0.16, z: 0.34, mist: [0.47, 0.75],
+        /* The bath is wide: two more columns spread across the water
+           (bath_mid / bath_right anchors in scripts/scenes.json). */
+        extra: [{ src: [900, 830], top: [900, 420], width: 0.16 },
+                { src: [1300, 820], top: [1300, 430], width: 0.14 }] },
       street: { x0: 0, y0: 700, x1: 1920, y1: 1080 },
       drips: null,
       snow: false },
@@ -499,6 +507,40 @@
     var h = (steam.src[1] - steam.top[1]) / 1080;
     return { cxU: steam.src[0] / 1920, cyV: cy, hFrac: h, wFrac: steam.width };
   }
+  /* Steam columns per scene (frame pixels): the main column from the
+     registry steam src/top, plus one column per extra source
+     (himeji's other two cups, gero's bath spread) and the ramen pot
+     (st.second, frame fractions). Steam-less scenes (hakodate) have
+     none — the builders return early on them. */
+  function steamSources(def) {
+    if (!def.steam) return [];
+    var out = [{ src: def.steam.src, top: def.steam.top, width: def.steam.width }];
+    if (def.steam.extra) {
+      for (var i = 0; i < def.steam.extra.length; i++) out.push(def.steam.extra[i]);
+    }
+    if (def.steam.second) {
+      var s2 = def.steam.second;
+      out.push({ src: [s2[0] * 1920, s2[1] * 1080], top: [s2[0] * 1920, (s2[1] - 0.18) * 1080], width: 0.10 });
+    }
+    return out;
+  }
+  /* One steam puff: where it is in its rise (phase 0..1 over
+     STEAM_LIFE seconds), how big, how visible. Pure — the render loop
+     only uploads the result. Phase 0 sits on the source, phase 1
+     reaches the top; alpha fades in fast and out slow; the puff grows
+     and sways as it rises, drifts with the wind, and the drag swirl
+     twists it sideways. seed is the particle's fixed random draw
+     {offset (seconds, unused here), sway, size}. */
+  var STEAM_LIFE = 2.6;
+  function steamParticle(source, phase, seed, wind, swirl, swirlAng) {
+    var rise = source.src[1] - source.top[1];
+    var w = source.width / 0.10;
+    var sway = Math.sin(phase * 4.5 + seed.sway) * (6 + 26 * phase) * w
+      + wind * phase * 70 + swirl * Math.sin(swirlAng + phase * 6) * 30;
+    var size = (16 + 38 * phase) * w * seed.size;
+    var alpha = smoothstep(0, 0.12, phase) * (1 - smoothstep(0.55, 1, phase)) * 0.5;
+    return { x: source.src[0] + sway, y: source.src[1] - rise * phase, size: size, alpha: alpha };
+  }
   var MAX_STEPS_PER_FRAME = 5;
 
   function mulberry32(a) {
@@ -510,6 +552,7 @@
     };
   }
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
   /* ---- plate geometry ---- */
   function plateScale(z) { return (CAM_D - z) / CAM_D; }
@@ -980,8 +1023,13 @@
     }
     var sr = null;
     if (def.steam) {
-      sr = steamRect(def.steam);
-      if (px >= sr.x0 && px <= sr.x1 && py >= sr.y0 && py <= sr.y1) return { kind: 'steam' };
+      // Every steam column is tappable, not just the main one — a tap
+      // on himeji's left cup or gero's bath swirls the steam too.
+      var srcs = steamSources(def);
+      for (var si = 0; si < srcs.length; si++) {
+        sr = steamRect(srcs[si]);
+        if (px >= sr.x0 && px <= sr.x1 && py >= sr.y0 && py <= sr.y1) return { kind: 'steam' };
+      }
     }
     var st = def.street;
     if (px >= st.x0 && px <= st.x1 && py >= st.y0 && py <= st.y1) {
@@ -1349,6 +1397,7 @@
     parallaxScaleFor: parallaxScaleFor, qualityTierFor: qualityTierFor,
     sceneById: sceneById, streetFracs: streetFracs,
     steamRect: steamRect, steamPlaneRect: steamPlaneRect,
+    steamSources: steamSources, steamParticle: steamParticle, STEAM_LIFE: STEAM_LIFE,
     classifyTap: classifyTap,
     addRing: addRing, addSwirl: addSwirl,
     waterStep: waterStep, waterImpulse: waterImpulse,
@@ -1531,7 +1580,7 @@ let norenStrips = [];   // 6 strip meshes
 let lanternGroups = []; // [rear, front]
 let water = null;       // { targetA, targetB, updateMat, ... } or CPU fallback
 let emissiveMat = null, streetMat = null, postMat = null, postScene = null, postCam = null;
-let rainLines = null, dripLines = null, snowLines = null, steamMats = [], steamMeshes = [], mistMat = null, mistMesh = null;
+let rainLines = null, dripLines = null, snowLines = null, steamPoints = null, steamParticles = [], mistMat = null, mistMesh = null;
 let taxiGroup = null, flashQuad = null;
 let textures = {};
 
@@ -1749,6 +1798,33 @@ const STEAM_FRAG = /* glsl */`
 const STEAM_VERT = /* glsl */`
   varying vec2 vUv;
   void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+/* Particle steam (2026-11-21): soft discs whose size/alpha come from
+   per-particle attributes, updated every frame by syncScene from the
+   pure L.steamParticle. gl_PointSize is in device pixels, so
+   uPointScale converts frame pixels (at 1080 height) to device
+   pixels — it is refreshed every frame from the canvas height, so a
+   quality-tier resize is tracked automatically. */
+const STEAM_POINTS_VERT = /* glsl */`
+  uniform float uPointScale;
+  attribute float aSize;
+  attribute float aAlpha;
+  varying float vAlpha;
+  void main() {
+    vAlpha = aAlpha;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = aSize * uPointScale;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+const STEAM_POINTS_FRAG = /* glsl */`
+  uniform float uAmount;
+  varying float vAlpha;
+  void main() {
+    float d = length(gl_PointCoord - vec2(0.5));
+    float disc = smoothstep(0.5, 0.08, d);
+    gl_FragColor = vec4(vec3(0.92, 0.94, 1.0), disc * vAlpha * uAmount);
+  }
 `;
 
 /* ---------- post shader ---------- */
@@ -2423,43 +2499,48 @@ function buildSteamMist() {
   const st = sceneDef.steam;
   // Steam-less scenes (hakodate-goryokaku: no steaming object, no mist
   // anchor) have nothing to build — the snow is the atmosphere there.
-  // Guard here, not in loadScene: steamMats/steamMeshes stay empty and
+  // Guard here, not in loadScene: steamPoints stays null and
   // mistMat/mistMesh stay null, and syncScene already tolerates both.
   if (!st) return;
-  const s = L.plateScale(st.z);
-  const mkSteam = (wFrac, hFrac, cxU, cyV) => {
-    const w = L.PLANE_W * wFrac * s, h = L.PLANE_H * hFrac * s;
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uAmount: { value: 0.5 }, uSwirl: { value: 0 }, uSwirlAng: { value: 0 }, uSwirlDir: { value: new THREE.Vector2(0, 0) } },
-      vertexShader: STEAM_VERT, fragmentShader: STEAM_FRAG,
-      transparent: true, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    mesh.position.set((cxU - 0.5) * L.PLANE_W * s, (0.5 - cyV) * L.PLANE_H * s, 0.36);
-    mesh.renderOrder = 7;
-    // Round 1 fix: the steam planes never shifted with the plates, so
-    // the steam detached from the bowl under parallax. Store the base
-    // position; syncScene shifts them with the steam source's layer.
-    mesh.userData.baseX = mesh.position.x;
-    mesh.userData.baseY = mesh.position.y;
-    mesh.userData.shiftZ = st.z;
-    scene.add(mesh);
-    steamMats.push(mat);
-    steamMeshes.push(mesh);
-    return mesh;
-  };
-  // Main steam column: centred on the midpoint between the source and
-  // the column top, exactly as tall as the column (steamPlaneRect).
-  // FIX (Phase 2): the old code passed bowlV = 1 - y/1080 (texture-v,
-  // from the bottom) where mkSteam expects a frame fraction from the
-  // top — the bowl steam was mirrored to the top of the frame (centre
-  // ~y=44 instead of ~y=722). The ramen mask-steam bbox (x 1316-1694,
-  // y 560-995) confirms the column runs from the bowl (885) up to the
-  // steam top (560). Live E2E must confirm the steam now sits above
-  // the bowl.
-  const rect = L.steamPlaneRect(st);
-  mkSteam(rect.wFrac, rect.hFrac, rect.cxU, rect.cyV);
-  if (st.second) mkSteam(0.10, 0.18, st.second[0], st.second[1]); // ramen pot / interior steam
+  // Particle steam (2026-11-21): one THREE.Points for every column in
+  // the scene (L.steamSources: main + extras + ramen pot). Each puff
+  // is a soft disc that spawns on its source, rises to the column
+  // top, grows, sways and fades — a visible rise. This replaces the
+  // old fixed shader column: its fbm noise scrolled inside a plane
+  // that never moved, so on a phone it read as static. The seeds are
+  // drawn from the fixed sim seed, so a frame is still a pure
+  // function of sim time; frustumCulled is off because the positions
+  // are rewritten every frame and a stale bound would cull the
+  // whole cloud.
+  const sources = L.steamSources(sceneDef);
+  const PER = 14;
+  const rng = L.mulberry32(L.SEED + 11);
+  steamParticles = [];
+  for (const src of sources) {
+    for (let i = 0; i < PER; i++) {
+      steamParticles.push({ src: src, offset: rng() * L.STEAM_LIFE, sway: rng() * Math.PI * 2, size: 0.85 + rng() * 0.3 });
+    }
+  }
+  const count = steamParticles.length;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(count), 1));
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(count), 1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uAmount: { value: 0.5 }, uPointScale: { value: 1 } },
+    vertexShader: STEAM_POINTS_VERT, fragmentShader: STEAM_POINTS_FRAG,
+    transparent: true, depthWrite: false,
+  });
+  steamPoints = new THREE.Points(geo, mat);
+  steamPoints.position.z = 0.36;
+  steamPoints.renderOrder = 7;
+  steamPoints.frustumCulled = false;
+  // Round 1 fix, same as the old column: the steam must shift with
+  // its plates under parallax, or it detaches from the bowl/cup/bath.
+  steamPoints.userData.baseX = 0;
+  steamPoints.userData.baseY = 0;
+  steamPoints.userData.shiftZ = st.z;
+  scene.add(steamPoints);
   // Alley mist: wide soft plane over the street band. Its centre is
   // per-scene (registry steam.mist, frame fractions): ramen keeps its
   // current spot (0.22, 0.72); the other scenes centre it on their
@@ -3328,13 +3409,9 @@ function syncScene() {
     g.position.y = g.userData.baseY + sh.y;
     g.rotation.z = sim.lanterns[i].a;
   });
-  // Steam / mist follow their plates under parallax (round 1 fix: they
-  // used to stay fixed while the bowl and street moved).
-  for (const m of steamMeshes) {
-    const sh = L.plateShift(m.userData.shiftZ, px, py);
-    m.position.x = m.userData.baseX + sh.x;
-    m.position.y = m.userData.baseY + sh.y;
-  }
+  // Mist follows its plate under parallax (round 1 fix: it used to
+  // stay fixed while the street moved). The particle steam shifts in
+  // its own update below, next to the mist uniforms.
   if (mistMesh) {
     const sh = L.plateShift(mistMesh.userData.shiftZ, px, py);
     mistMesh.position.x = mistMesh.userData.baseX + sh.x;
@@ -3401,15 +3478,33 @@ function syncScene() {
       }
     }
   }
-  // Steam / mist.
-  for (const m of steamMats) {
-    m.uniforms.uTime.value = sim.t;
-    m.uniforms.uAmount.value = p.steam;
-    // Round 1: the swirl now comes from the sim (accumulated drag
-    // angle, decaying), not from "any pointer is down".
-    m.uniforms.uSwirl.value = sim.swirl;
-    m.uniforms.uSwirlAng.value = sim.swirlAng;
-    m.uniforms.uSwirlDir.value.set(state.pointer.x, -state.pointer.y);
+  // Particle steam: each puff rises from its source, grows, sways
+  // and fades; the phase comes from the sim clock (sim.steamPhase,
+  // seconds) so a frame is a pure function of sim time. The Points
+  // object shifts with the steam layer under parallax, like the old
+  // column did. Positions are plane-local frame pixels, same
+  // convention as the strips ((fx/1920−0.5)·PLANE_W·s,
+  // (0.5−fy/1080)·PLANE_H·s) at the steam plane z = 0.36.
+  if (steamPoints) {
+    const sh = L.plateShift(steamPoints.userData.shiftZ, px, py);
+    steamPoints.position.x = steamPoints.userData.baseX + sh.x;
+    steamPoints.position.y = steamPoints.userData.baseY + sh.y;
+    const s = L.plateScale(0.36);
+    const attrs = steamPoints.geometry.attributes;
+    const posA = attrs.position, sizeA = attrs.aSize, alphaA = attrs.aAlpha;
+    for (let i = 0; i < steamParticles.length; i++) {
+      const pt = steamParticles[i];
+      const phase = ((sim.steamPhase + pt.offset) % L.STEAM_LIFE) / L.STEAM_LIFE;
+      const r = L.steamParticle(pt.src, phase, pt, p.wind, sim.swirl, sim.swirlAng);
+      posA.array[i * 3] = (r.x / 1920 - 0.5) * L.PLANE_W * s;
+      posA.array[i * 3 + 1] = (0.5 - r.y / 1080) * L.PLANE_H * s;
+      posA.array[i * 3 + 2] = 0;
+      sizeA.array[i] = r.size;
+      alphaA.array[i] = r.alpha;
+    }
+    posA.needsUpdate = true; sizeA.needsUpdate = true; alphaA.needsUpdate = true;
+    steamPoints.material.uniforms.uAmount.value = p.steam;
+    steamPoints.material.uniforms.uPointScale.value = renderer.domElement.height / 1080;
   }
   if (mistMat) { mistMat.uniforms.uTime.value = sim.t; mistMat.uniforms.uSwirlAng.value = 0; }
   // Taxi.
@@ -3632,7 +3727,7 @@ function disposeSceneGraph() {
   }
   textures = {};
   plates = {}; norenStrips = []; lanternGroups = [];
-  steamMats = []; steamMeshes = []; mistMat = null; mistMesh = null;
+  steamPoints = null; steamParticles = []; mistMat = null; mistMesh = null;
   streetMat = null; emissiveMat = null; rainLines = null; dripLines = null; snowLines = null;
   taxiGroup = null; flashQuad = null;
 }
