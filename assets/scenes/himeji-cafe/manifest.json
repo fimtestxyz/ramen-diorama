@@ -52,7 +52,7 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.1756
+      "coverage": 0.1785
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",

@@ -10,17 +10,17 @@
     "layer0": {
       "file": "layers/layer0-backdrop.png",
       "z": -0.36,
-      "coverage": 0.1123
+      "coverage": 0.1164
     },
     "layer1": {
       "file": "layers/layer1-far-mountains.png",
       "z": -0.05,
-      "coverage": 0.2127
+      "coverage": 0.213
     },
     "layer2": {
       "file": "layers/layer2-fence-trees.png",
       "z": 0.15,
-      "coverage": 0.3121
+      "coverage": 0.3008
     },
     "layer3": {
       "file": "layers/layer3-lanterns.png",
@@ -30,13 +30,13 @@
     "layer4": {
       "file": "layers/layer4-foreground-bath.png",
       "z": 0.34,
-      "coverage": 0.3335
+      "coverage": 0.3404
     }
   },
   "masks": {
     "mask-cloth": {
       "file": "masks/mask-cloth.png",
-      "coverage": 0.3121
+      "coverage": 0.3008
     },
     "mask-dry": {
       "file": "masks/mask-dry.png",
@@ -52,7 +52,7 @@
     },
     "mask-rain": {
       "file": "masks/mask-rain.png",
-      "coverage": 0.6371
+      "coverage": 0.6266
     },
     "mask-steam": {
       "file": "masks/mask-steam.png",
@@ -89,13 +89,17 @@
       700,
       1920,
       1080
+    ],
+    "bath_right": [
+      1300,
+      820
     ]
   },
   "cloth_layer": null,
   "static_file": null,
   "rest_composite": {
     "mean_abs_diff": 0.004,
-    "p99": 0.05,
+    "p99": 0.07,
     "max": 6.3
   }
 }
