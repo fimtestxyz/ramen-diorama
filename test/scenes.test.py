@@ -78,11 +78,14 @@ def test_scene(slug, cfg):
                   cov > 0.999, f"cov {cov:.3f}")
         else:
             # The 12px edge bleed (see soft() in scripts/slice.py)
-            # grows thin layers the most — osaka layer2 gains +0.051 —
-            # so the upper bound is +0.08, not the old +0.03.
+            # grows thin layers the most — osaka layer2 gains +0.051,
+            # gero's tree-heavy layer2 gains +0.085 (2026-11-21 v2 art;
+            # the feather grows with boundary length, and the fence+trees
+            # plate has the longest boundary) — so the upper bound is
+            # +0.10, not the old +0.08.
             check(f"{lid} alpha coverage >= assignment "
                   f"({info['coverage']:.3f} vs {cov:.3f})",
-                  info["coverage"] - 0.005 <= cov <= info["coverage"] + 0.08,
+                  info["coverage"] - 0.005 <= cov <= info["coverage"] + 0.10,
                   f"diff {cov - info['coverage']:.4f}")
 
     print("cloth static variant")

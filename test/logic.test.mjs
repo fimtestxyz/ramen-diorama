@@ -554,10 +554,10 @@ test('steam particles (2026-11-21): every cup / bath column steams; puffs rise, 
   // column; hakodate stays steam-less; ramen keeps bowl + pot.
   const h = L.steamSources(L.sceneById('himeji-cafe'));
   assert.equal(h.length, 3);
-  assert.equal(h.map((s) => s.src.join(',')).join(' | '), '945,805 | 455,860 | 1335,760');
+  assert.equal(h.map((s) => s.src.join(',')).join(' | '), '972,828 | 430,878 | 1330,785');
   const g = L.steamSources(L.sceneById('gero-onsen'));
   assert.equal(g.length, 3);
-  assert.equal(g.map((s) => s.src.join(',')).join(' | '), '500,800 | 900,830 | 1300,820');
+  assert.equal(g.map((s) => s.src.join(',')).join(' | '), '600,810 | 960,830 | 1320,810');
   assert.equal(L.steamSources(L.sceneById('hakodate-goryokaku')).length, 0);
   assert.equal(L.steamSources(L.sceneById('ramen')).length, 2);
   // A puff: phase 0 sits on the source invisible, phase 0.5 is
@@ -566,13 +566,13 @@ test('steam particles (2026-11-21): every cup / bath column steams; puffs rise, 
   const src = h[0];
   const seed = { offset: 0, sway: 0, size: 1 };
   const p0 = L.steamParticle(src, 0, seed, 0, 0, 0);
-  assert.equal(p0.y, 805); assert.equal(p0.alpha, 0);
+  assert.equal(p0.y, 828); assert.equal(p0.alpha, 0);
   const p5 = L.steamParticle(src, 0.5, seed, 0, 0, 0);
-  assert.ok(p5.y > 600 && p5.y < 805, `mid-rise y ${p5.y}`);
+  assert.ok(p5.y > 623 && p5.y < 828, `mid-rise y ${p5.y}`);
   assert.ok(p5.alpha > 0.2, `mid-rise alpha ${p5.alpha}`);
   assert.ok(p5.size > p0.size, `puff grows ${p0.size} -> ${p5.size}`);
   const p1 = L.steamParticle(src, 1, seed, 0, 0, 0);
-  assert.equal(p1.y, 600); assert.equal(p1.alpha, 0);
+  assert.equal(p1.y, 623); assert.equal(p1.alpha, 0);
   // Wind drifts exactly wind * phase * 70 px sideways (sway cancels
   // out when the same seed and phase are compared).
   const windDrift = L.steamParticle(src, 0.9, seed, 1, 0, 0).x - L.steamParticle(src, 0.9, seed, 0, 0, 0).x;
@@ -581,9 +581,9 @@ test('steam particles (2026-11-21): every cup / bath column steams; puffs rise, 
   assert.notEqual(
     L.steamParticle(src, 0.5, seed, 0, 1, 0).x, L.steamParticle(src, 0.5, seed, 0, 0, 0).x);
   // Taps on the side cups and the bath columns swirl the steam too.
-  assert.equal(L.classifyTap(455, 700, 'himeji-cafe').kind, 'steam');
-  assert.equal(L.classifyTap(1335, 650, 'himeji-cafe').kind, 'steam');
-  assert.equal(L.classifyTap(900, 600, 'gero-onsen').kind, 'steam');
+  assert.equal(L.classifyTap(430, 750, 'himeji-cafe').kind, 'steam');
+  assert.equal(L.classifyTap(1330, 680, 'himeji-cafe').kind, 'steam');
+  assert.equal(L.classifyTap(960, 600, 'gero-onsen').kind, 'steam');
 });
 
 test('phase 2: classifyTap per scene (noren, lanterns, street band)', () => {
